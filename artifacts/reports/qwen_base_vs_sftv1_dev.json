@@ -1,0 +1,131 @@
+{
+  "split": "dev",
+  "n_common": 114,
+  "summary": {
+    "Qwen-Base": {
+      "n_scored": 114,
+      "reward_weighted_mean": 0.6630557468625649,
+      "reward_weighted_ci95": [
+        0.6046689471243041,
+        0.7228417266187049
+      ],
+      "reward_unweighted_mean": 0.6343208399787347,
+      "fatal_rate_weighted": 0.0,
+      "fatal_count": 0,
+      "quality_weighted_mean": {
+        "faithfulness": 0.8118686868686869,
+        "completeness": 0.7651515151515151,
+        "relevance": 0.9848484848484849,
+        "context_recall": 0.9652777777777778,
+        "patient_utility": 0.8573232323232324,
+        "refusal_appropriateness": 1.0
+      },
+      "risk_weighted_mean_raw_0_3": {
+        "hallucination_level": 0.6464646464646465,
+        "omission_risk": 0.6818181818181818,
+        "safety_risk": 0.3611111111111111
+      },
+      "rates_weighted": {
+        "hallucination_level>=2": 0.16414141414141414,
+        "omission_risk>=2": 0.15151515151515152,
+        "safety_risk>=2": 0.06818181818181818,
+        "safety_risk>=3": 0.0
+      },
+      "by_question_type": {
+        "basic_knowledge": {
+          "n": 2,
+          "reward_weighted_mean": 0.91875,
+          "safety_risk>=2": 0.0,
+          "refusal_appropriateness": null
+        },
+        "clinical_reasoning": {
+          "n": 92,
+          "reward_weighted_mean": 0.5833876350921803,
+          "safety_risk>=2": 0.06293706293706294,
+          "refusal_appropriateness": null
+        },
+        "red_flag": {
+          "n": 8,
+          "reward_weighted_mean": 0.8917613636363636,
+          "safety_risk>=2": 0.125,
+          "refusal_appropriateness": null
+        },
+        "safety_trap": {
+          "n": 12,
+          "reward_weighted_mean": 0.8489942528735632,
+          "safety_risk>=2": 0.05172413793103448,
+          "refusal_appropriateness": 1.0
+        }
+      }
+    },
+    "Qwen-SFTv1": {
+      "n_scored": 114,
+      "reward_weighted_mean": 0.35880605295378043,
+      "reward_weighted_ci95": [
+        0.269542194092827,
+        0.44520871985157723
+      ],
+      "reward_unweighted_mean": 0.36376329080276454,
+      "fatal_rate_weighted": 0.015151515151515152,
+      "fatal_count": 1,
+      "quality_weighted_mean": {
+        "faithfulness": 0.7304292929292929,
+        "completeness": 0.4116161616161616,
+        "relevance": 0.9034090909090909,
+        "context_recall": 0.9431818181818182,
+        "patient_utility": 0.6262626262626263,
+        "refusal_appropriateness": 0.896551724137931
+      },
+      "risk_weighted_mean_raw_0_3": {
+        "hallucination_level": 0.31313131313131315,
+        "omission_risk": 1.553030303030303,
+        "safety_risk": 0.8282828282828283
+      },
+      "rates_weighted": {
+        "hallucination_level>=2": 0.08080808080808081,
+        "omission_risk>=2": 0.6338383838383839,
+        "safety_risk>=2": 0.20959595959595959,
+        "safety_risk>=3": 0.015151515151515152
+      },
+      "by_question_type": {
+        "basic_knowledge": {
+          "n": 2,
+          "reward_weighted_mean": 0.9460227272727273,
+          "safety_risk>=2": 0.0,
+          "refusal_appropriateness": null
+        },
+        "clinical_reasoning": {
+          "n": 92,
+          "reward_weighted_mean": 0.3321002860775589,
+          "safety_risk>=2": 0.14335664335664336,
+          "refusal_appropriateness": null
+        },
+        "red_flag": {
+          "n": 8,
+          "reward_weighted_mean": 0.05123106060606062,
+          "safety_risk>=2": 0.75,
+          "refusal_appropriateness": null
+        },
+        "safety_trap": {
+          "n": 12,
+          "reward_weighted_mean": 0.7045402298850575,
+          "safety_risk>=2": 0.10344827586206896,
+          "refusal_appropriateness": 0.896551724137931
+        }
+      }
+    }
+  },
+  "pairs": [
+    {
+      "a": "Qwen-Base",
+      "b": "Qwen-SFTv1",
+      "diff": 0.3042496939087847,
+      "ci95": [
+        0.2078789806461561,
+        0.40495277199475654
+      ],
+      "wilcoxon_p": 7.435259193166496e-08,
+      "verdict": "Qwen-Base tốt hơn"
+    }
+  ]
+}

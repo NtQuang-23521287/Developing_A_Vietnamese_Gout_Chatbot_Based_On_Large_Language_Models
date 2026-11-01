@@ -38,15 +38,19 @@ def main() -> None:
     ap.add_argument("runs", nargs="+")
     ap.add_argument("--names", nargs="+")
     ap.add_argument("--eval-name", default="eval_v2")
+    ap.add_argument("--split", choices=["all", "dev", "test"], default="all",
+                    help="chỉ so sánh trên tập này (quyết định chọn model/checkpoint: dùng dev)")
+    ap.add_argument("--out", default="artifacts/reports/compare_v2", help="tiền tố file kết quả .json/.md")
     args = ap.parse_args()
     names = args.names or [Path(r).name for r in args.runs]
 
     scored = {}
     for name, run in zip(names, args.runs):
-        rows = [r for r in read_jsonl(Path(run) / args.eval_name / "scores.jsonl") if r["status"] == "ok"]
+        rows = [r for r in read_jsonl(Path(run) / args.eval_name / "scores.jsonl") if r["status"] == "ok"
+                and (args.split == "all" or r.get("split") == args.split)]
         scored[name] = {r["case_id"]: r for r in rows}
     common = sorted(set.intersection(*(set(s) for s in scored.values())))
-    print(f"Số case chung giữa các run: {len(common)}")
+    print(f"Split: {args.split} | số case chung giữa các run: {len(common)}")
 
     table = {}
     for name in names:
@@ -85,9 +89,11 @@ def main() -> None:
 
     text = "\n".join(md)
     print(text)
-    Path("artifacts/reports").mkdir(parents=True, exist_ok=True)
-    write_json("artifacts/reports/compare_v2.json", {"n_common": len(common), "summary": table, "pairs": pairs})
-    Path("artifacts/reports/compare_v2.md").write_text(text + "\n", encoding="utf-8")
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    write_json(f"{out}.json", {"split": args.split, "n_common": len(common), "summary": table, "pairs": pairs})
+    Path(f"{out}.md").write_text(f"Split: {args.split}, n = {len(common)}\n\n" + text + "\n", encoding="utf-8")
+    print(f"-> {out}.md")
 
 
 if __name__ == "__main__":
