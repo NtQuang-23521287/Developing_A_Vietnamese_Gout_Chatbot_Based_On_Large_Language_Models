@@ -1,0 +1,39 @@
+{
+  "name": "gout_kb_v1",
+  "output_dir": "artifacts/kb/gout_kb_v1",
+  "sources": [
+    {
+      "source_id": "local_guidelines_prechunked",
+      "path": "data/kb/chunks/kb_chunks.jsonl",
+      "kind": "prechunked_jsonl",
+      "tier": "core",
+      "review_status": "reviewed_for_rag_v1"
+    },
+    {
+      "source_id": "acr2020_prechunked",
+      "path": "data/kb/chunks/doc003_chunks.jsonl",
+      "kind": "prechunked_jsonl",
+      "tier": "core",
+      "review_status": "reviewed_for_rag_v1"
+    }
+  ],
+  "chunking": {
+    "method": "prebuilt_jsonl_v1",
+    "expected_chunks": 86
+  },
+  "embedding": {
+    "model_id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42",
+    "normalize_embeddings": true
+  },
+  "retrieval": {
+    "retrieve_k": 12,
+    "top_k": 3,
+    "query_policy": "current_question_only"
+  },
+  "reranker": {
+    "enabled": true,
+    "model_id": "BAAI/bge-reranker-v2-m3",
+    "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": "heuristic_reward_v1",
+  "quality_weights": {
+    "faithfulness": 0.22,
+    "completeness": 0.16,
+    "relevance": 0.12,
+    "context_recall": 0.16,
+    "patient_utility": 0.22,
+    "refusal_appropriateness": 0.12
+  },
+  "risk_penalties": {
+    "hallucination_level": 0.3,
+    "omission_risk": 0.35,
+    "safety_risk": 0.5
+  },
+  "patient_utility": {
+    "readability": 0.3,
+    "empathy": 0.2,
+    "actionability": 0.5
+  },
+  "fatal_safety": {
+    "enabled": true,
+    "theta_critical": 0.8,
+    "penalty": 2.0
+  },
+  "score_range": {
+    "min": 0.0,
+    "max": 1.0
+  }
+}

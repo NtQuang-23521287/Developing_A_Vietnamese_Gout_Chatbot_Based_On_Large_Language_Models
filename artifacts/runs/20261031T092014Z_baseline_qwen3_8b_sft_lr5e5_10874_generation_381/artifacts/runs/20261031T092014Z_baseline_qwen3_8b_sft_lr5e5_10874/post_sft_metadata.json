@@ -1,0 +1,15 @@
+{
+  "evaluation": "post_sft_v03_381",
+  "model": "qwen3",
+  "sft_run": "/content/DEVELOPING_A_VIETNAMESE_GOUT_CHATBOT_BASED_ON_LARGE_LANGUAGE_MODELS/artifacts/runs/sft_qwen3_8b_v2",
+  "adapter_path": "/content/DEVELOPING_A_VIETNAMESE_GOUT_CHATBOT_BASED_ON_LARGE_LANGUAGE_MODELS/artifacts/runs/sft_qwen3_8b_v2/checkpoint-150",
+  "adapter_sha256": "e8b7a2a56878e346779dff0613ccc45f9596c1940aed8fdac0ecc6d8df3f351a",
+  "sft_learning_rate": 5e-05,
+  "sft_epochs": 10,
+  "best_step": 150,
+  "best_eval_loss": 1.545759916305542,
+  "testset_sha256": "bf23a3ba761d3debc8c7ed9af1e81d25799347d959fe1040ee92a8f048fa7e9c",
+  "full_benchmark": true,
+  "compute_dtype": "float16",
+  "warning": "Research only; not for medical use. Check SFT/test contamination."
+}

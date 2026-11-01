@@ -1,0 +1,22 @@
+{
+  "name": "qwen3_8b_sft_lr5e5",
+  "provider": "huggingface",
+  "model_id": "Qwen/Qwen3-8B",
+  "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "trust_remote_code": true,
+  "quantization": {
+    "mode": "nf4",
+    "compute_dtype": "float16",
+    "double_quant": true
+  },
+  "generation": {
+    "do_sample": false,
+    "temperature": null,
+    "top_p": null,
+    "max_new_tokens": 512
+  },
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "adapter_path": "/content/DEVELOPING_A_VIETNAMESE_GOUT_CHATBOT_BASED_ON_LARGE_LANGUAGE_MODELS/artifacts/runs/sft_qwen3_8b_v2/checkpoint-150"
+}

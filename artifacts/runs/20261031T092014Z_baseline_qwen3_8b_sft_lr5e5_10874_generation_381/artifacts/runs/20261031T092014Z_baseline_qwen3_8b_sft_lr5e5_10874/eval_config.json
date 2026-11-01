@@ -1,0 +1,53 @@
+{
+  "name": "post_sft_v03_381",
+  "phase": "post_sft_evaluation",
+  "seed": 2026,
+  "testset": {
+    "path": "data/testset_v03/cases_all.jsonl",
+    "version": "testset_v03",
+    "allowed_reference_status": [
+      "approved"
+    ]
+  },
+  "rag": {
+    "config": "configs/rag/rag_v1.yaml",
+    "index_dir": "artifacts/kb/gout_kb_v1"
+  },
+  "prompt": {
+    "system": "prompts/system_vi_v1.txt",
+    "version": "system_vi_v1"
+  },
+  "conversation": {
+    "max_history_pairs": 2,
+    "reset_between_cases": true
+  },
+  "input": {
+    "max_input_tokens": 4096,
+    "overflow_policy": "error"
+  },
+  "generation": {
+    "max_new_tokens": 512
+  },
+  "judge": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "rubric": "rubrics/medical_9_metrics.yaml",
+    "prompt": "prompts/judge_vi_v2.txt"
+  },
+  "ragas": {
+    "enabled": false,
+    "metrics": [
+      "faithfulness",
+      "context_recall"
+    ]
+  },
+  "tracking": {
+    "mlflow_enabled": false,
+    "tracking_uri": "sqlite:///mlflow.db",
+    "experiment_name": "gout_baseline_selection_v03"
+  },
+  "output": {
+    "root": "artifacts/runs"
+  }
+}
