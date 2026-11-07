@@ -8,14 +8,21 @@ Các bước (chạy lần lượt; mỗi bước ghi file trung gian nên chạ
               (cần faiss, sentence-transformers, FlagEmbedding -> nên chạy trên Colab)
   answer    : gpt-4.1-mini viết câu trả lời giọng tư vấn, chỉ dựa trên context
   filter    : lọc bằng luật (Vinmec, tên người, địa chỉ, liều, độ dài, tiếng Anh...) + LLM kiểm tra căn cứ/an toàn
+  review_export : xuất file Excel cho BÁC SĨ duyệt (artifacts/sft_v2/review/sft_v2_review.xlsx)
+  review_import : đọc kết quả duyệt (Đạt / Cần sửa / Loại) -> reviewed.jsonl + review_manifest.json
+              (quy tắc: src/gout_llmops/data/doctor_review.py)
   build     : dựng messages bằng build_messages() của hệ thống (system prompt + NGỮ CẢNH RAG + lịch sử),
-              chia train/val, ghi data/sft_v2/ + manifest
+              chia train/val, ghi data/sft_v2/ + manifest. Mặc định CHỈ build từ dữ liệu bác sĩ đã duyệt.
 
 Ví dụ:
   PYTHONPATH=src python3 scripts/build_sft_v2.py questions
   PYTHONPATH=src python3 scripts/build_sft_v2.py retrieve          # Colab GPU
   PYTHONPATH=src python3 scripts/build_sft_v2.py answer
   PYTHONPATH=src python3 scripts/build_sft_v2.py filter
+  PYTHONPATH=src python3 scripts/build_sft_v2.py review_export
+  #   ... bác sĩ duyệt file Excel ...
+  PYTHONPATH=src python3 scripts/build_sft_v2.py review_import --dry-run      # xem tiến độ
+  PYTHONPATH=src python3 scripts/build_sft_v2.py review_import --reviewer "BS. ..."
   PYTHONPATH=src python3 scripts/build_sft_v2.py build
 Thử toàn bộ không tốn tiền, không cần GPU: thêm --mock (KHÔNG dùng dữ liệu mock để train).
 """
@@ -459,9 +466,116 @@ def stage_filter(args, llm: LLM) -> None:
 # ---------------------------------------------------------------------------
 # Bước 5: build
 # ---------------------------------------------------------------------------
+def _review_file(args) -> Path:
+    return Path(args.review_file) if args.review_file else WORK / "review" / "sft_v2_review.xlsx"
+
+
+def stage_review_export(args) -> None:
+    from gout_llmops.core.hashing import sha256_file
+    from gout_llmops.data.doctor_review import CATEGORY_VI, write_review_xlsx
+
+    src = WORK / "filtered.jsonl"
+    path = _review_file(args)
+    if path.exists() and not args.force:
+        raise SystemExit(f"{path} đã tồn tại (có thể đã chứa kết quả bác sĩ duyệt) — không ghi đè.\n"
+                         "Muốn đọc kết quả: chạy review_import. Chắc chắn muốn xuất lại từ đầu: thêm --force.")
+    rows = read_jsonl(src)
+    n = write_review_xlsx(rows, path, source_file=str(src), source_sha256=sha256_file(src))
+    cats = Counter(r["category"] for r in rows)
+    print(f"Đã xuất {n} mẫu cần duyệt -> {path}")
+    for c in ("red_flag", "safety_trap", "clinical_reasoning", "out_of_scope", "basic_knowledge"):
+        if cats.get(c):
+            print(f"  {CATEGORY_VI[c]:<22} {cats[c]:>4}")
+    print(f"Ước tính thời gian bác sĩ: ~{n * 2 / 60:.0f}–{n * 3 / 60:.0f} giờ (2–3 phút/mẫu). "
+          "File đã xếp rủi ro cao lên đầu.")
+
+
+def stage_review_import(args) -> None:
+    from gout_llmops.core.hashing import sha256_file
+    from gout_llmops.data.doctor_review import CATEGORY_VI, PRIORITY, apply_review, read_review_xlsx
+
+    src = WORK / "filtered.jsonl"
+    path = _review_file(args)
+    if not path.exists():
+        raise SystemExit(f"Không thấy file duyệt {path}. Chạy review_export trước, hoặc chỉ đường dẫn bằng --review-file.")
+    records, meta = read_review_xlsx(path)
+    src_sha = sha256_file(src)
+    if meta.get("source_sha256") and meta["source_sha256"] != src_sha:
+        msg = (f"{src} đã thay đổi sau khi xuất file duyệt (chạy lại answer/filter?). "
+               "Câu trả lời trong file bác sĩ duyệt có thể không còn khớp dữ liệu hiện tại.")
+        if not args.force:
+            raise SystemExit(msg + " Thêm --force nếu chắc chắn vẫn muốn áp dụng.")
+        print("[!] " + msg)
+    if not meta:
+        print("[!] File không còn sheet _meta (có thể do chuyển sang Google Sheets) — vẫn đối chiếu theo cột Mã.")
+
+    res = apply_review(read_jsonl(src), records, unreviewed=args.unreviewed)
+    st = res["stats"]
+    print(f"Duyệt {st['n_reviewed']}/{st['n_source']} mẫu: Đạt {st['n_approve']} | Cần sửa {st['n_edit']} | "
+          f"Loại {st['n_reject']} | Chưa duyệt {st['n_unreviewed']}")
+    vi = {"approve": "Đạt", "edit": "Cần sửa", "reject": "Loại", "unreviewed": "Chưa duyệt"}
+    for cat in sorted(st["by_category"], key=lambda c: PRIORITY.get(c, 9)):
+        c = st["by_category"][cat]
+        print(f"  {CATEGORY_VI.get(cat, cat):<22} " + " | ".join(f"{vi[k]} {c[k]}" for k in vi if c.get(k)))
+    if st["error_types"]:
+        print("Loại lỗi bác sĩ ghi:", st["error_types"])
+    for w in res["warnings"]:
+        print("[!]", w)
+    if res["errors"]:
+        print(f"\n{len(res['errors'])} lỗi trong file duyệt — sửa trong file rồi chạy lại:")
+        for e in res["errors"]:
+            print("  -", e)
+        raise SystemExit(1)
+
+    # Bản bác sĩ sửa không bị loại tự động, nhưng nêu ra nếu vi phạm luật lọc (vd. ghi liều cụ thể) để nhóm xem lại
+    flagged = []
+    for r in res["kept"]:
+        if r.get("review", {}).get("verdict") == "edit":
+            f = rule_flags(r["answers"][-1])
+            if f:
+                flagged.append((r["id"], f))
+    for rid, f in flagged:
+        print(f"[!] Bản sửa của {rid} vi phạm luật lọc {f} — vẫn giữ (ý kiến bác sĩ), nên xem lại.")
+
+    if st["n_unreviewed"]:
+        policy = ("BỎ, không dùng để train" if args.unreviewed == "drop"
+                  else "GIỮ bản AI (--unreviewed keep), manifest sẽ ghi rõ")
+        print(f"[!] {st['n_unreviewed']} mẫu chưa duyệt: {policy}.")
+    if args.dry_run:
+        print("(--dry-run: chỉ xem tiến độ, chưa ghi file)")
+        return
+    if not res["kept"]:
+        raise SystemExit("Không còn mẫu nào để train (chưa duyệt mẫu nào?).")
+    write_jsonl(WORK / "reviewed.jsonl", res["kept"])
+    write_jsonl(WORK / "review_rejected.jsonl", res["rejected"])
+    write_json(WORK / "review_manifest.json", {
+        **st, "reviewer": args.reviewer, "review_file": str(path), "review_file_sha256": sha256_file(path),
+        "source_file": str(src), "source_sha256": src_sha, "edited_rule_flags": {k: v for k, v in flagged},
+        "imported_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "mock": bool(args.mock),
+    })
+    print(f"Đã ghi {WORK / 'reviewed.jsonl'} ({len(res['kept'])} mẫu) + review_manifest.json")
+
+
+def _rows_for_build(args) -> tuple[list[dict[str, Any]], dict[str, Any] | None, str]:
+    """Dữ liệu đưa vào build: bản bác sĩ đã duyệt; chỉ dùng bản chưa duyệt khi --skip-review (hoặc --mock)."""
+    from gout_llmops.core.hashing import sha256_file
+
+    reviewed, review_manifest, src = WORK / "reviewed.jsonl", WORK / "review_manifest.json", WORK / "filtered.jsonl"
+    if reviewed.exists() and not args.skip_review:
+        review = json.loads(review_manifest.read_text(encoding="utf-8")) if review_manifest.exists() else {}
+        if review.get("source_sha256") and src.exists() and review["source_sha256"] != sha256_file(src):
+            raise SystemExit(f"{src} đã thay đổi sau lần review_import gần nhất — chạy lại review_import.")
+        return read_jsonl(reviewed), review, str(reviewed)
+    if args.skip_review or args.mock:
+        return read_jsonl(src), None, str(src)
+    raise SystemExit("Chưa có kết quả bác sĩ duyệt (artifacts/sft_v2/reviewed.jsonl).\n"
+                     "Chạy: review_export -> bác sĩ duyệt file Excel -> review_import, rồi mới build.\n"
+                     "Cố ý train dữ liệu chưa duyệt: thêm --skip-review.")
+
+
 def stage_build(args) -> None:
     system_prompt = Path(SYSTEM_PROMPT_PATH).read_text(encoding="utf-8")
-    rows = read_jsonl(WORK / "filtered.jsonl")
+    rows, review, data_file = _rows_for_build(args)
     rng = random.Random(args.seed)
     by_cat: dict[str, list] = {}
     for r in rows:
@@ -494,18 +608,29 @@ def stage_build(args) -> None:
         "format": "build_messages(system_vi_v1 + NGỮ CẢNH RAG, history<=2 cặp) + assistant — giống hệt lúc suy luận",
         "leakage_guard": "4-gram Jaccard < 0.40 với mọi lượt của testset v03",
         "mock": bool(args.mock),
-        "note": "Câu trả lời do gpt-4.1-mini viết từ context KB và lọc tự động; chưa qua chuyên gia y khoa.",
+        "data_file": data_file,
+        "doctor_review": ({k: review.get(k) for k in ("rule_version", "reviewer", "n_source", "n_reviewed", "n_approve",
+                                                     "n_edit", "n_reject", "n_unreviewed", "unreviewed_policy",
+                                                     "error_types", "review_file_sha256", "imported_at")}
+                          if review is not None else "skipped"),
+        "note": ("Câu trả lời do gpt-4.1-mini viết từ context KB, lọc tự động, rồi bác sĩ duyệt"
+                 + (f" ({review.get('n_reviewed')}/{review.get('n_source')} mẫu; "
+                    f"{review.get('n_unreviewed')} mẫu chưa duyệt: {review.get('unreviewed_policy')})."
+                    if review else ".")
+                 if review is not None else
+                 "Câu trả lời do gpt-4.1-mini viết từ context KB và lọc tự động; CHƯA qua bác sĩ duyệt."),
     }
     for f in ("train.jsonl", "val.jsonl"):
         manifest[f"sha256_{f}"] = hashlib.sha256((OUT / f).read_bytes()).hexdigest()
     write_json(OUT / "manifest.json", manifest)
     print(json.dumps({k: manifest[k] for k in ("n_train", "n_val", "by_category", "multi_turn",
-                                               "answer_words_median", "mock")}, ensure_ascii=False, indent=1))
+                                               "answer_words_median", "data_file", "mock")}, ensure_ascii=False, indent=1))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["questions", "retrieve", "answer", "filter", "build"])
+    ap.add_argument("stage", choices=["questions", "retrieve", "answer", "filter", "review_export", "review_import",
+                                      "build"])
     ap.add_argument("--mock", action="store_true", help="không gọi API/không cần GPU — chỉ để thử pipeline")
     ap.add_argument("--model", default="gpt-4.1-mini")
     ap.add_argument("--testset", default="data/testset_v03/cases_all.jsonl")
@@ -517,6 +642,15 @@ def main() -> None:
     ap.add_argument("--val-ratio", type=float, default=0.1)
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--limit", type=int, default=None)
+    rv = ap.add_argument_group("bác sĩ duyệt (review_export / review_import / build)")
+    rv.add_argument("--review-file", default=None, help="mặc định artifacts/sft_v2/review/sft_v2_review.xlsx")
+    rv.add_argument("--reviewer", default="", help="tên/chức danh bác sĩ duyệt, ghi vào manifest")
+    rv.add_argument("--unreviewed", choices=["drop", "keep"], default="drop",
+                    help="mẫu bác sĩ chưa duyệt: drop = bỏ (mặc định), keep = giữ bản AI")
+    rv.add_argument("--dry-run", action="store_true", help="review_import: chỉ xem tiến độ, không ghi file")
+    rv.add_argument("--force", action="store_true",
+                    help="review_export: ghi đè file duyệt; review_import: bỏ qua kiểm tra dữ liệu gốc đã đổi")
+    rv.add_argument("--skip-review", action="store_true", help="build: cố ý dùng dữ liệu CHƯA duyệt")
     args = ap.parse_args()
     if args.mock:
         global WORK, OUT, CACHE
@@ -527,6 +661,10 @@ def main() -> None:
         stage_retrieve(args)
     elif args.stage == "build":
         stage_build(args)
+    elif args.stage == "review_export":
+        stage_review_export(args)
+    elif args.stage == "review_import":
+        stage_review_import(args)
     else:
         llm = LLM(args.model, args.mock)
         {"questions": stage_questions, "answer": stage_answer, "filter": stage_filter}[args.stage](args, llm)

@@ -6,8 +6,9 @@
   mine     : chọn cặp Chosen/Rejected theo Preference Mining Rule (src/gout_llmops/training/preference.py).
   train    : DPO bằng TRL + QLoRA; reference = chính policy trước khi train.
 
-Câu hỏi lấy từ artifacts/sft_v2/filtered.jsonl (output bước `filter` của build_sft_v2.py): đã chống leakage với
-testset v03, context RAG truy xuất bằng đúng retriever lúc suy luận, có câu trả lời mẫu đã lọc làm REFERENCE cho judge.
+Câu hỏi lấy từ artifacts/sft_v2/reviewed.jsonl (output bước `review_import` của build_sft_v2.py): đã chống leakage
+với testset v03, context RAG truy xuất bằng đúng retriever lúc suy luận, câu trả lời mẫu đã được BÁC SĨ duyệt/sửa làm
+REFERENCE cho judge (mẫu bác sĩ loại không được dùng).
 KHÔNG dùng câu hỏi dev/test cho DPO.
 
 Ví dụ (Colab, từ thư mục gốc repo):
@@ -86,6 +87,9 @@ def stage_generate(args, P: Paths) -> None:
     if policy and not args.mock:
         check_adapter_dir(policy)   # báo lỗi sớm (thiếu adapter / chỉ là con trỏ LFS) trước khi nạp model 8B
 
+    if not Path(args.prompts).exists():
+        raise SystemExit(f"Không thấy {args.prompts}. Chạy build_sft_v2.py review_import trước "
+                         "(hoặc --prompts artifacts/sft_v2/filtered.jsonl nếu cố ý dùng dữ liệu chưa duyệt).")
     rows = [r for r in read_jsonl(args.prompts) if r.get("answers") and r.get("contexts")]
     selected = select_prompts(rows, args.max_prompts, args.seed)
     meta = {"policy_adapter": policy, "model_config": MODEL_CONFIG, "prompts_file": args.prompts,
@@ -302,7 +306,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="stage", required=True)
     g = sub.add_parser("generate")
     g.add_argument("--policy-adapter", default="none", help="thư mục adapter SFT, hoặc none = Qwen gốc")
-    g.add_argument("--prompts", default="artifacts/sft_v2/filtered.jsonl")
+    g.add_argument("--prompts", default="artifacts/sft_v2/reviewed.jsonl")
     g.add_argument("--k", type=int, default=4, help="số ứng viên mỗi câu (đề cương: 3–5)")
     g.add_argument("--max-prompts", type=int, default=300)
     g.add_argument("--batch-prompts", type=int, default=2, help="số câu hỏi sinh song song (×k chuỗi); L4/A100 dùng 4")
