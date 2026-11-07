@@ -524,7 +524,8 @@ def stage_review_import(args) -> None:
     print(f"Bác sĩ đã duyệt {st['n_reviewed']}/{st['n_sent_to_doctor']} mẫu được gửi (bộ dữ liệu có {st['n_source']}): "
           f"Đạt {st['n_approve']} | Cần sửa {st['n_edit']} | Loại {st['n_reject']}")
     if st["pass_rate"] is not None:
-        print(f"Tỉ lệ Đạt (ước lượng chất lượng dữ liệu tự động): {st['pass_rate']:.1%}")
+        print(f"Tỉ lệ Đạt trên các mẫu đã duyệt: {st['pass_rate']:.1%} | ước lượng cho toàn bộ dữ liệu "
+              f"(trọng số theo số mẫu mỗi loại): {st['pass_rate_weighted']:.1%}")
     vi = {"approve": "Đạt", "edit": "Cần sửa", "reject": "Loại", "unreviewed": "Chưa duyệt/không gửi"}
     for cat in sorted(st["by_category"], key=lambda c: PRIORITY.get(c, 9)):
         c = st["by_category"][cat]
@@ -628,7 +629,8 @@ def stage_build(args) -> None:
         "data_file": data_file,
         "doctor_review": ({k: review.get(k) for k in ("rule_version", "reviewer", "n_source", "n_sent_to_doctor",
                                                      "n_reviewed", "n_approve", "n_edit", "n_reject", "n_unreviewed",
-                                                     "unreviewed_policy", "pass_rate", "pass_rate_by_category",
+                                                     "unreviewed_policy", "pass_rate", "pass_rate_weighted",
+                                                     "pass_rate_by_category",
                                                      "error_types", "review_file_sha256", "imported_at")}
                           if review is not None else "skipped"),
         "note": ("Câu trả lời do gpt-4.1-mini viết từ context KB, lọc tự động, rồi bác sĩ duyệt"

@@ -121,6 +121,16 @@ def test_not_sent_rows_are_unreviewed_without_missing_warning():
     assert any("không có trong file duyệt" in w for w in res["warnings"])
 
 
+def test_weighted_pass_rate_corrects_oversampling():
+    # red_flag: 2 mẫu, gửi hết, 0% Đạt. basic: 8 mẫu, gửi 2, 100% Đạt.
+    rows = [_row("r1", "red_flag"), _row("r2", "red_flag")] + [_row(f"b{i}", "basic_knowledge") for i in range(8)]
+    recs = [_rec("r1", "Loại"), _rec("r2", "Loại"), _rec("b0", "Đạt"), _rec("b1", "Đạt")]
+    st = apply_review(rows, recs, unreviewed="keep", exported_ids=["r1", "r2", "b0", "b1"])["stats"]
+    assert st["pass_rate"] == 0.5                 # thô: 2/4
+    assert st["pass_rate_weighted"] == 0.8        # (2*0 + 8*1) / 10
+    assert st["pass_rate_by_category"] == {"basic_knowledge": 1.0, "red_flag": 0.0}
+
+
 def test_xlsx_roundtrip(tmp_path):
     openpyxl = pytest.importorskip("openpyxl")
     rows = [_row("a", "basic_knowledge"), _row("b", "red_flag", turns=("Q1", "Q2"), answers=("A1", "=A2"))]

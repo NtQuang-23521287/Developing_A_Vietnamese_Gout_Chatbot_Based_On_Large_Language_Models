@@ -427,6 +427,13 @@ def apply_review(rows: list[dict[str, Any]], records: list[dict[str, Any]], *,
     for c in by_cat.values():
         total.update(c)
     n_reviewed = total["approve"] + total["edit"] + total["reject"]
+    rate_by_cat = {k: v["approve"] / (v["approve"] + v["edit"] + v["reject"])
+                   for k, v in by_cat.items() if v["approve"] + v["edit"] + v["reject"]}
+    size_by_cat = {k: sum(v.values()) for k, v in by_cat.items()}
+    # Mẫu phân tầng không tỉ lệ (vd. lấy hết red_flag, 20 câu mỗi loại khác) -> ước lượng cho TOÀN BỘ dữ liệu phải
+    # lấy trọng số theo kích thước từng loại: sum_c N_c * p_c / sum_c N_c (chỉ trên các loại có mẫu được duyệt).
+    weighted = (sum(size_by_cat[k] * p for k, p in rate_by_cat.items()) / sum(size_by_cat[k] for k in rate_by_cat)
+                if rate_by_cat else None)
     stats = {
         "rule_version": RULE_VERSION,
         "unreviewed_policy": unreviewed,
@@ -435,8 +442,8 @@ def apply_review(rows: list[dict[str, Any]], records: list[dict[str, Any]], *,
         "n_reviewed": n_reviewed,
         # Tỉ lệ bác sĩ chấm "Đạt" trên các mẫu đã duyệt = ước lượng chất lượng dữ liệu do pipeline tự động tạo
         "pass_rate": round(total["approve"] / n_reviewed, 4) if n_reviewed else None,
-        "pass_rate_by_category": {k: round(v["approve"] / (v["approve"] + v["edit"] + v["reject"]), 4)
-                                  for k, v in sorted(by_cat.items()) if v["approve"] + v["edit"] + v["reject"]},
+        "pass_rate_weighted": round(weighted, 4) if weighted is not None else None,
+        "pass_rate_by_category": {k: round(p, 4) for k, p in sorted(rate_by_cat.items())},
         "n_approve": total["approve"],
         "n_edit": total["edit"],
         "n_reject": total["reject"],
