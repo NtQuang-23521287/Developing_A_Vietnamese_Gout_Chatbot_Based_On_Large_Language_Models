@@ -1,16 +1,31 @@
-name: dpo_v1
-status: scaffold
-base_model_or_adapter: checkpoints/sft_v1
-preference_data: data/processed/dpo/preference_v1.jsonl
-output_dir: checkpoints/dpo_v1
+# Giai đoạn 4 — DPO v1 (TRL + QLoRA 4-bit). Chạy: python scripts/dpo_pipeline.py train --config configs/training/dpo_v1.yaml
+# Siêu tham số là điểm xuất phát cho bộ dữ liệu nhỏ (~200–400 cặp); chọn checkpoint theo REWARD TRÊN DEV.
+name: dpo_qwen3_8b_v1
+status: ready
+base_model_config: configs/models/qwen3_8b.yaml
+# Adapter SFT dùng làm policy VÀ reference. Đặt null (hoặc --policy-adapter none) để DPO thẳng trên Qwen gốc
+# khi SFT v3 không qua cổng đánh giá. Phải trùng policy đã sinh ứng viên (dữ liệu on-policy).
+policy_adapter: artifacts/runs/sft_qwen3_8b_v3
+preference_data: data/dpo/preference_v1.jsonl
+output_dir: artifacts/runs/dpo_qwen3_8b_v1
 seed: 2026
-candidate_generation:
-  k: 4
-preference_mining:
-  heuristic_version: heuristic_reward_v1
+eval_ratio: 0.1
+max_length: 2048          # prompt (system + 3 chunk RAG + lịch sử) ~1.000–1.400 token + câu trả lời ≤ 512
+max_prompt_length: 1536
+new_lora:                 # chỉ dùng khi policy_adapter = null
+  r: 16
+  alpha: 32
+  dropout: 0.05           # > 0 để dùng được MC Dropout trên LoRA ở Giai đoạn 5
 trainer:
   beta: 0.1
-  learning_rate: 0.000005
-  num_train_epochs: 1
+  loss_type: sigmoid
+  learning_rate: 0.00001  # LoRA + ít dữ liệu: 5e-6 gần như không làm adapter thay đổi
+  num_train_epochs: 2
   per_device_train_batch_size: 1
   gradient_accumulation_steps: 8
+  warmup_ratio: 0.1
+  lr_scheduler_type: cosine
+  logging_steps: 5
+  optim: paged_adamw_8bit
+  precompute_ref_log_probs: true   # tính log-prob của reference một lần trước khi train, tiết kiệm VRAM
+  use_logits_to_keep: true         # chỉ tính logits phần câu trả lời (vocab Qwen 152k rất tốn bộ nhớ)
