@@ -10,6 +10,8 @@ Quy tắc áp dụng kết quả duyệt (doctor_review_v1):
 - "Loại"    : bỏ mẫu (ghi vào review_rejected.jsonl để phân tích).
 - Để trống  : chưa duyệt. Mặc định BỎ (unreviewed="drop") để chỉ train trên dữ liệu đã được bác sĩ xác nhận;
               unreviewed="keep" giữ bản AI và manifest ghi rõ số mẫu chưa duyệt.
+Có thể chỉ gửi bác sĩ một MẪU phân tầng theo loại câu hỏi (select_for_review): tỉ lệ "Đạt" trên mẫu là ước lượng chất
+lượng của dữ liệu do pipeline tự động tạo; phần không gửi xử lý như "chưa duyệt".
 Mọi mâu thuẫn (chọn "Đạt" nhưng có sửa, "Cần sửa" mà không có bản sửa, giá trị lạ, mã trùng/không tồn tại)
 đều báo lỗi kèm số dòng — không tự đoán ý bác sĩ.
 """
@@ -28,6 +30,7 @@ SHEET_GUIDE = "Hướng dẫn"
 SHEET_REVIEW = "Duyệt"
 SHEET_DOCS = "Tài liệu"
 SHEET_META = "_meta"
+SHEET_IDS = "_ids"
 
 VERDICT_LABELS = ("Đạt", "Cần sửa", "Loại")
 _VERDICT_KEYS = {"dat": "approve", "can sua": "edit", "loai": "reject"}
@@ -149,6 +152,30 @@ def order_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: (PRIORITY.get(r.get("category"), 9), str(r["id"])))
 
 
+def select_for_review(rows: list[dict[str, Any]], *, per_category: int | None = None,
+                      full_categories: tuple[str, ...] | list[str] = (), seed: int = 2026) -> list[dict[str, Any]]:
+    """Chọn mẫu gửi bác sĩ. per_category=None: tất cả. Ngược lại: lấy NGẪU NHIÊN (có seed) tối đa per_category mẫu
+    mỗi loại câu hỏi — mẫu phân tầng, nên tỉ lệ Đạt/Cần sửa/Loại ước lượng được chất lượng của cả bộ dữ liệu —
+    riêng các loại trong full_categories thì lấy hết (vd. red_flag)."""
+    if per_category is None:
+        return list(rows)
+    import random
+
+    rng = random.Random(seed)
+    by_cat: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        by_cat.setdefault(r.get("category") or "unknown", []).append(r)
+    out = []
+    for cat in sorted(by_cat):
+        group = sorted(by_cat[cat], key=lambda r: str(r["id"]))
+        if cat in full_categories:
+            out += group
+        else:
+            rng.shuffle(group)
+            out += group[:per_category]
+    return out
+
+
 def format_history(turns: list[str], answers: list[str]) -> str:
     parts = [f"Người hỏi: {t}\nAI: {a}" for t, a in zip(turns[:-1], answers[:-1])]
     return "\n\n".join(parts)
@@ -173,7 +200,10 @@ def sheet_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Excel
 # ---------------------------------------------------------------------------
-def write_review_xlsx(rows: list[dict[str, Any]], path: str | Path, *, source_file: str, source_sha256: str) -> int:
+def write_review_xlsx(rows: list[dict[str, Any]], path: str | Path, *, source_file: str, source_sha256: str,
+                      selection: str = "all") -> int:
+    """rows = các mẫu GỬI bác sĩ (đã chọn bằng select_for_review). Danh sách mã được lưu ở sheet ẩn _ids để lúc
+    nhập lại phân biệt 'không gửi' với 'đã gửi nhưng bác sĩ chưa duyệt / lỡ xóa dòng'."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -260,11 +290,15 @@ def write_review_xlsx(rows: list[dict[str, Any]], path: str | Path, *, source_fi
 
     meta = wb.create_sheet(SHEET_META)
     for i, (k, v) in enumerate((("rule_version", RULE_VERSION), ("source_file", source_file),
-                                ("source_sha256", source_sha256), ("n_rows", n),
+                                ("source_sha256", source_sha256), ("n_rows", n), ("selection", selection),
                                 ("exported_at", datetime.now(timezone.utc).isoformat(timespec="seconds"))), 1):
         put(meta, i, 1, k)
         put(meta, i, 2, v)
     meta.sheet_state = "hidden"
+    ids = wb.create_sheet(SHEET_IDS)
+    for i, sr in enumerate(srows, 1):
+        put(ids, i, 1, sr["id"])
+    ids.sheet_state = "hidden"
 
     wb.active = 0
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -291,11 +325,14 @@ def read_review_xlsx(path: str | Path) -> tuple[list[dict[str, Any]], dict[str, 
         if clean_text(rec.get("id")).strip():
             rec["_row"] = row_no
             records.append(rec)
-    meta = {}
+    meta: dict[str, Any] = {}
     if SHEET_META in wb.sheetnames:
         for k, v, *_ in wb[SHEET_META].iter_rows(values_only=True):
             if k is not None:
                 meta[str(k)] = v
+    if SHEET_IDS in wb.sheetnames:
+        meta["exported_ids"] = [clean_text(v).strip() for (v, *_) in wb[SHEET_IDS].iter_rows(values_only=True)
+                                if clean_text(v).strip()]
     return records, meta
 
 
@@ -303,8 +340,9 @@ def read_review_xlsx(path: str | Path) -> tuple[list[dict[str, Any]], dict[str, 
 # Áp dụng kết quả duyệt
 # ---------------------------------------------------------------------------
 def apply_review(rows: list[dict[str, Any]], records: list[dict[str, Any]], *,
-                 unreviewed: str = "drop") -> dict[str, Any]:
-    """Trả về {"errors", "warnings", "kept", "rejected", "stats"}. Có lỗi thì kept/rejected rỗng."""
+                 unreviewed: str = "drop", exported_ids: list[str] | None = None) -> dict[str, Any]:
+    """Trả về {"errors", "warnings", "kept", "rejected", "stats"}. Có lỗi thì kept/rejected rỗng.
+    exported_ids: các mã đã gửi bác sĩ (None = gửi tất cả). Mẫu không gửi được tính là chưa duyệt."""
     if unreviewed not in ("drop", "keep"):
         raise ValueError("unreviewed phải là 'drop' hoặc 'keep'")
     by_id = {str(r["id"]): r for r in rows}
@@ -353,7 +391,8 @@ def apply_review(rows: list[dict[str, Any]], records: list[dict[str, Any]], *,
                           "error_type": clean_text(rec.get("error_type")).strip(),
                           "note": clean_text(rec.get("note")).strip(), "row": rec.get("_row")}
 
-    missing = [rid for rid in by_id if rid not in seen]
+    sent = [rid for rid in exported_ids if rid in by_id] if exported_ids is not None else list(by_id)
+    missing = [rid for rid in sent if rid not in seen]
     if missing:
         warnings.append(f"{len(missing)} mẫu không có trong file duyệt (bị xóa dòng?) — coi như chưa duyệt: "
                         + ", ".join(missing[:10]) + (" ..." if len(missing) > 10 else ""))
@@ -387,11 +426,17 @@ def apply_review(rows: list[dict[str, Any]], records: list[dict[str, Any]], *,
     total = Counter()
     for c in by_cat.values():
         total.update(c)
+    n_reviewed = total["approve"] + total["edit"] + total["reject"]
     stats = {
         "rule_version": RULE_VERSION,
         "unreviewed_policy": unreviewed,
         "n_source": len(rows),
-        "n_reviewed": total["approve"] + total["edit"] + total["reject"],
+        "n_sent_to_doctor": len(sent),
+        "n_reviewed": n_reviewed,
+        # Tỉ lệ bác sĩ chấm "Đạt" trên các mẫu đã duyệt = ước lượng chất lượng dữ liệu do pipeline tự động tạo
+        "pass_rate": round(total["approve"] / n_reviewed, 4) if n_reviewed else None,
+        "pass_rate_by_category": {k: round(v["approve"] / (v["approve"] + v["edit"] + v["reject"]), 4)
+                                  for k, v in sorted(by_cat.items()) if v["approve"] + v["edit"] + v["reject"]},
         "n_approve": total["approve"],
         "n_edit": total["edit"],
         "n_reject": total["reject"],

@@ -1,7 +1,7 @@
 import pytest
 
 from gout_llmops.data.doctor_review import (COLUMNS, SHEET_REVIEW, apply_review, order_rows, parse_verdict,
-                                            read_review_xlsx, write_review_xlsx)
+                                            read_review_xlsx, select_for_review, write_review_xlsx)
 
 
 def _row(rid, cat="basic_knowledge", turns=("Gút là gì?",), answers=("Câu trả lời AI.",)):
@@ -94,6 +94,33 @@ def test_order_rows_puts_high_risk_first():
     assert [r["category"] for r in order_rows(rows)] == ["red_flag", "safety_trap", "basic_knowledge"]
 
 
+def test_select_for_review_stratified_and_full_categories():
+    rows = ([_row(f"b{i}", "basic_knowledge") for i in range(30)]
+            + [_row(f"r{i}", "red_flag") for i in range(12)]
+            + [_row(f"s{i}", "safety_trap") for i in range(3)])
+    sel = select_for_review(rows, per_category=5, full_categories=("red_flag",), seed=1)
+    cats = [r["category"] for r in sel]
+    assert cats.count("basic_knowledge") == 5
+    assert cats.count("red_flag") == 12          # lấy hết
+    assert cats.count("safety_trap") == 3        # ít hơn N thì lấy hết
+    assert [r["id"] for r in sel] == [r["id"] for r in select_for_review(rows, per_category=5,
+                                                                         full_categories=("red_flag",), seed=1)]
+    assert select_for_review(rows) == rows
+
+
+def test_not_sent_rows_are_unreviewed_without_missing_warning():
+    rows = [_row("a"), _row("b"), _row("c")]
+    res = apply_review(rows, [_rec("a", "Đạt")], unreviewed="keep", exported_ids=["a"])
+    assert res["warnings"] == []
+    assert res["stats"]["n_sent_to_doctor"] == 1
+    assert res["stats"]["n_unreviewed"] == 2
+    assert res["stats"]["pass_rate"] == 1.0
+    assert {r["id"] for r in res["kept"]} == {"a", "b", "c"}
+    # gửi a, b nhưng b bị xóa khỏi file -> cảnh báo
+    res = apply_review(rows, [_rec("a", "Đạt")], exported_ids=["a", "b"])
+    assert any("không có trong file duyệt" in w for w in res["warnings"])
+
+
 def test_xlsx_roundtrip(tmp_path):
     openpyxl = pytest.importorskip("openpyxl")
     rows = [_row("a", "basic_knowledge"), _row("b", "red_flag", turns=("Q1", "Q2"), answers=("A1", "=A2"))]
@@ -112,7 +139,8 @@ def test_xlsx_roundtrip(tmp_path):
 
     records, meta = read_review_xlsx(path)
     assert meta["source_sha256"] == "abc"
-    res = apply_review(rows, records)
+    assert sorted(meta["exported_ids"]) == ["a", "b"]
+    res = apply_review(rows, records, exported_ids=meta["exported_ids"])
     assert res["errors"] == []
     kept = {r["id"]: r for r in res["kept"]}
     assert kept["b"]["answers"] == ["A1", "A2 bác sĩ sửa"]

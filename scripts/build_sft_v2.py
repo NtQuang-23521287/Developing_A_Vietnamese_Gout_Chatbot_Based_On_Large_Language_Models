@@ -472,7 +472,7 @@ def _review_file(args) -> Path:
 
 def stage_review_export(args) -> None:
     from gout_llmops.core.hashing import sha256_file
-    from gout_llmops.data.doctor_review import CATEGORY_VI, write_review_xlsx
+    from gout_llmops.data.doctor_review import CATEGORY_VI, select_for_review, write_review_xlsx
 
     src = WORK / "filtered.jsonl"
     path = _review_file(args)
@@ -480,14 +480,24 @@ def stage_review_export(args) -> None:
         raise SystemExit(f"{path} đã tồn tại (có thể đã chứa kết quả bác sĩ duyệt) — không ghi đè.\n"
                          "Muốn đọc kết quả: chạy review_import. Chắc chắn muốn xuất lại từ đầu: thêm --force.")
     rows = read_jsonl(src)
-    n = write_review_xlsx(rows, path, source_file=str(src), source_sha256=sha256_file(src))
-    cats = Counter(r["category"] for r in rows)
-    print(f"Đã xuất {n} mẫu cần duyệt -> {path}")
+    full = tuple(c.strip() for c in (args.full_categories or "").split(",") if c.strip())
+    unknown = [c for c in full if c not in CATEGORIES]
+    if unknown:
+        raise SystemExit(f"--full-categories có loại không tồn tại: {unknown} (hợp lệ: {', '.join(CATEGORIES)})")
+    sent = select_for_review(rows, per_category=args.per_category, full_categories=full, seed=args.seed)
+    selection = ("all" if args.per_category is None else
+                 json.dumps({"per_category": args.per_category, "full_categories": list(full), "seed": args.seed}))
+    n = write_review_xlsx(sent, path, source_file=str(src), source_sha256=sha256_file(src), selection=selection)
+    cats_all, cats_sent = Counter(r["category"] for r in rows), Counter(r["category"] for r in sent)
+    print(f"Đã xuất {n}/{len(rows)} mẫu cần duyệt -> {path}")
     for c in ("red_flag", "safety_trap", "clinical_reasoning", "out_of_scope", "basic_knowledge"):
-        if cats.get(c):
-            print(f"  {CATEGORY_VI[c]:<22} {cats[c]:>4}")
+        if cats_all.get(c):
+            print(f"  {CATEGORY_VI[c]:<22} {cats_sent.get(c, 0):>4} / {cats_all[c]}")
     print(f"Ước tính thời gian bác sĩ: ~{n * 2 / 60:.0f}–{n * 3 / 60:.0f} giờ (2–3 phút/mẫu). "
           "File đã xếp rủi ro cao lên đầu.")
+    if n < len(rows):
+        print(f"{len(rows) - n} mẫu không gửi bác sĩ. Khi review_import, dùng --unreviewed keep để vẫn train các mẫu này "
+              "(bản AI đã qua lọc tự động); mặc định drop sẽ bỏ chúng.")
 
 
 def stage_review_import(args) -> None:
@@ -509,14 +519,18 @@ def stage_review_import(args) -> None:
     if not meta:
         print("[!] File không còn sheet _meta (có thể do chuyển sang Google Sheets) — vẫn đối chiếu theo cột Mã.")
 
-    res = apply_review(read_jsonl(src), records, unreviewed=args.unreviewed)
+    res = apply_review(read_jsonl(src), records, unreviewed=args.unreviewed, exported_ids=meta.get("exported_ids"))
     st = res["stats"]
-    print(f"Duyệt {st['n_reviewed']}/{st['n_source']} mẫu: Đạt {st['n_approve']} | Cần sửa {st['n_edit']} | "
-          f"Loại {st['n_reject']} | Chưa duyệt {st['n_unreviewed']}")
-    vi = {"approve": "Đạt", "edit": "Cần sửa", "reject": "Loại", "unreviewed": "Chưa duyệt"}
+    print(f"Bác sĩ đã duyệt {st['n_reviewed']}/{st['n_sent_to_doctor']} mẫu được gửi (bộ dữ liệu có {st['n_source']}): "
+          f"Đạt {st['n_approve']} | Cần sửa {st['n_edit']} | Loại {st['n_reject']}")
+    if st["pass_rate"] is not None:
+        print(f"Tỉ lệ Đạt (ước lượng chất lượng dữ liệu tự động): {st['pass_rate']:.1%}")
+    vi = {"approve": "Đạt", "edit": "Cần sửa", "reject": "Loại", "unreviewed": "Chưa duyệt/không gửi"}
     for cat in sorted(st["by_category"], key=lambda c: PRIORITY.get(c, 9)):
         c = st["by_category"][cat]
-        print(f"  {CATEGORY_VI.get(cat, cat):<22} " + " | ".join(f"{vi[k]} {c[k]}" for k in vi if c.get(k)))
+        rate = st["pass_rate_by_category"].get(cat)
+        print(f"  {CATEGORY_VI.get(cat, cat):<22} " + " | ".join(f"{vi[k]} {c[k]}" for k in vi if c.get(k))
+              + (f"   (Đạt {rate:.0%})" if rate is not None else ""))
     if st["error_types"]:
         print("Loại lỗi bác sĩ ghi:", st["error_types"])
     for w in res["warnings"]:
@@ -540,7 +554,10 @@ def stage_review_import(args) -> None:
     if st["n_unreviewed"]:
         policy = ("BỎ, không dùng để train" if args.unreviewed == "drop"
                   else "GIỮ bản AI (--unreviewed keep), manifest sẽ ghi rõ")
-        print(f"[!] {st['n_unreviewed']} mẫu chưa duyệt: {policy}.")
+        print(f"[!] {st['n_unreviewed']} mẫu chưa duyệt hoặc không gửi bác sĩ: {policy}.")
+        if args.unreviewed == "drop" and st["n_sent_to_doctor"] < st["n_source"]:
+            print(f"[!] File duyệt chỉ là mẫu ({st['n_sent_to_doctor']}/{st['n_source']}); với --unreviewed drop, "
+                  f"dữ liệu train chỉ còn khoảng {st['n_approve'] + st['n_edit']} mẫu. Muốn giữ phần không gửi: --unreviewed keep.")
     if args.dry_run:
         print("(--dry-run: chỉ xem tiến độ, chưa ghi file)")
         return
@@ -609,8 +626,9 @@ def stage_build(args) -> None:
         "leakage_guard": "4-gram Jaccard < 0.40 với mọi lượt của testset v03",
         "mock": bool(args.mock),
         "data_file": data_file,
-        "doctor_review": ({k: review.get(k) for k in ("rule_version", "reviewer", "n_source", "n_reviewed", "n_approve",
-                                                     "n_edit", "n_reject", "n_unreviewed", "unreviewed_policy",
+        "doctor_review": ({k: review.get(k) for k in ("rule_version", "reviewer", "n_source", "n_sent_to_doctor",
+                                                     "n_reviewed", "n_approve", "n_edit", "n_reject", "n_unreviewed",
+                                                     "unreviewed_policy", "pass_rate", "pass_rate_by_category",
                                                      "error_types", "review_file_sha256", "imported_at")}
                           if review is not None else "skipped"),
         "note": ("Câu trả lời do gpt-4.1-mini viết từ context KB, lọc tự động, rồi bác sĩ duyệt"
@@ -644,6 +662,10 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None)
     rv = ap.add_argument_group("bác sĩ duyệt (review_export / review_import / build)")
     rv.add_argument("--review-file", default=None, help="mặc định artifacts/sft_v2/review/sft_v2_review.xlsx")
+    rv.add_argument("--per-category", type=int, default=None,
+                    help="review_export: chỉ gửi bác sĩ tối đa N mẫu ngẫu nhiên mỗi loại câu hỏi (mặc định: gửi tất cả)")
+    rv.add_argument("--full-categories", default="",
+                    help="review_export: các loại gửi TOÀN BỘ dù có --per-category, vd. red_flag,safety_trap")
     rv.add_argument("--reviewer", default="", help="tên/chức danh bác sĩ duyệt, ghi vào manifest")
     rv.add_argument("--unreviewed", choices=["drop", "keep"], default="drop",
                     help="mẫu bác sĩ chưa duyệt: drop = bỏ (mặc định), keep = giữ bản AI")
