@@ -97,7 +97,7 @@ def _json_from_text(text: str) -> dict[str, Any]:
         if not isinstance(data, dict):
             raise ValueError("Judge output must be a JSON object.")
         return data
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as err:
         # Last-resort extraction of the outermost JSON object.
         start = raw.find("{")
         end = raw.rfind("}")
@@ -105,11 +105,11 @@ def _json_from_text(text: str) -> dict[str, Any]:
             raise ValueError(
                 "Judge did not return valid JSON. Raw output: "
                 + raw[:1200]
-            )
+            ) from err
 
         data = json.loads(raw[start : end + 1])
         if not isinstance(data, dict):
-            raise ValueError("Judge output must be a JSON object.")
+            raise ValueError("Judge output must be a JSON object.") from err
         return data
 
 

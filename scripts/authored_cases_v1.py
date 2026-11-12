@@ -659,7 +659,7 @@ def main() -> None:
     new = pd.DataFrame(CASES)
     out = pd.concat([old, new], ignore_index=True)
 
-    kb = {json.loads(l)["chunk_id"] for l in open("artifacts/kb/gout_kb_v1/chunks.jsonl", encoding="utf-8")}
+    kb = {json.loads(line)["chunk_id"] for line in open("artifacts/kb/gout_kb_v1/chunks.jsonl", encoding="utf-8")}
     bad = {r["case_id"]: [c for c in r["evidence_chunk_ids"].split(" || ") if c and c not in kb]
            for r in CASES}
     bad = {k: v for k, v in bad.items() if v}

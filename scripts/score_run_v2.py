@@ -2,7 +2,7 @@
 
 Ví dụ:
   # thử pipeline, không tốn tiền
-  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/20261011T121543Z_baseline_qwen3_8b_8656 --mock --limit 10
+  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --mock --limit 10
   # chấm thật 5 case trước để xem
   PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --limit 5
   # chấm hết
@@ -14,7 +14,6 @@ Chỉ case có trong cả run và testset mới được chấm (run baseline c�
 from __future__ import annotations
 
 import argparse
-import json
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,8 +22,13 @@ import yaml
 from gout_llmops.core.hashing import sha256_file
 from gout_llmops.core.io import read_jsonl, write_json, write_jsonl
 from gout_llmops.data.testset import load_cases
-from gout_llmops.evaluation.judge_v2 import (JUDGE_VERSION, MockJudge, OpenAIJudgeV2, build_judge_input,
-                                             validate_judge_output)
+from gout_llmops.evaluation.judge_v2 import (
+    JUDGE_VERSION,
+    MockJudge,
+    OpenAIJudgeV2,
+    build_judge_input,
+    validate_judge_output,
+)
 from gout_llmops.evaluation.reward_v2 import aggregate, compute_reward_v2, validate_config
 
 PRICE_PER_M = {"gpt-4o-mini": (0.15, 0.60), "gpt-4.1-mini": (0.40, 1.60)}  # USD / 1M token (input, output)
@@ -103,7 +107,8 @@ def main() -> None:
         "reward_version": cfg["version"], "testset": args.testset, "split": args.split,
         "testset_sha256": sha256_file(args.testset), "n_cases_in_testset": len(cases),
         "n_not_in_run": len(missing), "n_errors": len(rows) - len(ok),
-        "judge_usage": u, "judge_cost_usd_est": round(u["input_tokens"] / 1e6 * pin + u["output_tokens"] / 1e6 * pout, 4),
+        "judge_usage": u,
+        "judge_cost_usd_est": round(u["input_tokens"] / 1e6 * pin + u["output_tokens"] / 1e6 * pout, 4),
         "warning": "MOCK JUDGE — không dùng cho kết quả" if args.mock else None,
     })
     out = run / args.out_name
@@ -111,7 +116,8 @@ def main() -> None:
     write_json(out / "summary.json", summary)
 
     print(f"\nĐã chấm {len(ok)} case, lỗi {len(rows) - len(ok)} -> {out}")
-    print(f"Reward (TB có trọng số risk): {summary.get('reward_weighted_mean'):.4f}  CI95 {summary.get('reward_weighted_ci95')}")
+    print(f"Reward (TB có trọng số risk): {summary.get('reward_weighted_mean'):.4f}  "
+          f"CI95 {summary.get('reward_weighted_ci95')}")
     print("Rate có trọng số:", {k: round(v, 3) for k, v in summary.get("rates_weighted", {}).items()})
     print(f"Fatal: {summary.get('fatal_count')} | Chi phí judge ước tính: ${summary['judge_cost_usd_est']}")
 

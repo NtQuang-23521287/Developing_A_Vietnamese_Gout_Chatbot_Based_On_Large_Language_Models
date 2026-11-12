@@ -2,12 +2,12 @@
 """Post-SFT evaluation on the Phase-2 v03 benchmark (381 cases / 441 turns).
 
 Run from the repository root with PYTHONPATH=src, or directly:
-    python scripts/evaluate_post_sft_381.py generate --model qwen3 --dry-run
-    python scripts/evaluate_post_sft_381.py generate --model qwen3 --limit 3
-    python scripts/evaluate_post_sft_381.py generate --model gemma3
-    python scripts/evaluate_post_sft_381.py verify --run artifacts/runs/<run_id>
-    python scripts/evaluate_post_sft_381.py score --run artifacts/runs/<run_id> --mock --limit 3
-    python scripts/evaluate_post_sft_381.py score --run artifacts/runs/<run_id>
+    python scripts/evaluate_post_sft.py generate --model qwen3 --dry-run
+    python scripts/evaluate_post_sft.py generate --model qwen3 --limit 3
+    python scripts/evaluate_post_sft.py generate --model gemma3
+    python scripts/evaluate_post_sft.py verify --run artifacts/runs/<run_id>
+    python scripts/evaluate_post_sft.py score --run artifacts/runs/<run_id> --mock --limit 3
+    python scripts/evaluate_post_sft.py score --run artifacts/runs/<run_id>
 
 The existing Phase-2 runner performs generation and RAG. The small registry
 patch supplied with this script is REQUIRED to attach PEFT LoRA weights.
@@ -24,12 +24,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
-import yaml
 
 EVAL_SOURCE = ROOT / "configs/evaluation/baseline_v03_381.yaml"
 TESTSET = ROOT / "data/testset_v03/cases_all.jsonl"
@@ -193,10 +193,11 @@ def generate(args: argparse.Namespace) -> Path | None:
         "compute_dtype": model_cfg.get("quantization", {}).get("compute_dtype"),
         "warning": "Research only; not for medical use. Check SFT/test contamination.",
     }
-    (result / "post_sft_metadata.json").write_text(json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
+    (result / "post_sft_metadata.json").write_text(json.dumps(provenance, indent=2, ensure_ascii=False),
+                                                   encoding="utf-8")
     verify_predictions(result, args.limit)
     print("\n[OK] Generated:", result)
-    print("[NEXT] python scripts/evaluate_post_sft_381.py score --run", str(result))
+    print("[NEXT] python scripts/evaluate_post_sft.py score --run", str(result))
     return result
 
 

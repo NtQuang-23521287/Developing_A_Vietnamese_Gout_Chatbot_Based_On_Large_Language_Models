@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def import_script():
-    p = Path(__file__).resolve().parents[1] / "scripts/evaluate_post_sft_381.py"
+    p = Path(__file__).resolve().parents[1] / "scripts/evaluate_post_sft.py"
     spec = importlib.util.spec_from_file_location("sft_eval_test_module", p)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

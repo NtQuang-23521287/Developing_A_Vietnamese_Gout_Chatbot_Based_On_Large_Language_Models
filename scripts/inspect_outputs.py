@@ -29,8 +29,10 @@ def main() -> None:
     ap.add_argument("--names", nargs="+")
     args = ap.parse_args()
     names = args.names or [Path(r).name[:30] for r in args.runs]
+    if len(names) != len(args.runs):
+        ap.error(f"--names có {len(names)} tên nhưng có {len(args.runs)} run")
     stats = {}
-    for name, run in zip(names, args.runs):
+    for name, run in zip(names, args.runs, strict=True):
         preds = [p for p in read_jsonl(Path(run) / "predictions.jsonl") if p.get("status") == "ok"]
         ans = [p["answer"] for p in preds]
         row = {"n_turns": len(ans),

@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 QUALITY_KEYS = ("faithfulness", "completeness", "relevance",
                 "context_recall", "patient_utility", "refusal_appropriateness")
@@ -105,7 +106,7 @@ def compute_reward_v2(raw: dict[str, Any], *, question_type: str, risk_level: st
 # Tổng hợp theo công thức (4)
 # ---------------------------------------------------------------------------
 def _wmean(values: Iterable[float], weights: Iterable[float]) -> float | None:
-    pairs = [(v, w) for v, w in zip(values, weights) if v is not None]
+    pairs = [(v, w) for v, w in zip(values, weights, strict=True) if v is not None]
     tw = sum(w for _, w in pairs)
     return sum(v * w for v, w in pairs) / tw if tw else None
 

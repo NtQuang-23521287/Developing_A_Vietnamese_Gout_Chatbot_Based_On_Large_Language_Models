@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
 from gout_llmops.core.hashing import sha256_text
 from gout_llmops.rag.documents import Document
 

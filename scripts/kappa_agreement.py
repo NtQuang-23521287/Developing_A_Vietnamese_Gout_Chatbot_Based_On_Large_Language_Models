@@ -97,8 +97,8 @@ def score(args) -> None:
         if wk is not None:
             print(f"  Weighted kappa       : {result[k]['weighted_kappa_linear']}")
         print(f"  {a} khớp GPT / {b} khớp GPT: {vs_llm_a:.1%} / {vs_llm_b:.1%}")
-        cm = pd.DataFrame(confusion_matrix(x, y, labels=labels), index=[f"{a}:{l}" for l in labels],
-                          columns=[f"{b}:{l}" for l in labels])
+        cm = pd.DataFrame(confusion_matrix(x, y, labels=labels), index=[f"{a}:{lab}" for lab in labels],
+                          columns=[f"{b}:{lab}" for lab in labels])
         print(cm.loc[(cm.sum(axis=1) > 0), (cm.sum(axis=0) > 0)].to_string())
 
     dis = []

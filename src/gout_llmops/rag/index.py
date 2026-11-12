@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-import numpy as np
-from gout_llmops.core.io import ensure_dir, write_json, write_jsonl
+
 from gout_llmops.core.hashing import sha256_file
+from gout_llmops.core.io import ensure_dir, write_json, write_jsonl
 from gout_llmops.rag.chunking import Chunk
 
 

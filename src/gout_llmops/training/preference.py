@@ -59,7 +59,7 @@ def prompt_messages(system_prompt: str, turns: list[str], answers: list[str],
     """Đúng định dạng lúc suy luận: system + NGỮ CẢNH RAG của lượt cuối + lịch sử (câu trả lời mẫu) + câu hỏi cuối."""
     i = len(turns) - 1
     history: list[dict[str, str]] = []
-    for u, a in zip(turns[:i], answers[:i]):
+    for u, a in zip(turns[:i], answers[:i], strict=False):
         history += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
     return build_messages(system_prompt, turns[i], history, final_contexts, max_history_pairs)
 

@@ -66,6 +66,7 @@ serve = [
 ]
 dev = [
   "pytest>=8.0",
+  "openpyxl>=3.1",        # tests/test_doctor_review.py (file Excel gửi bác sĩ)
   "ruff>=0.7",
   "pre-commit>=4.0",
   "dvc>=3.55",
@@ -80,8 +81,12 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.ruff]
-line-length = 100
+line-length = 120          # chuỗi/comment tiếng Việt dài; 120 là độ dài code của nhóm đang dùng
 target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# File dữ liệu: nội dung case kiểm thử viết tay, tách chuỗi dễ làm sai nội dung.
+"scripts/authored_cases_v1.py" = ["E501"]

@@ -230,7 +230,7 @@ def main() -> None:
     ap.add_argument("--kb-chunks", default="artifacts/kb/gout_kb_v1/chunks.jsonl")
     args = ap.parse_args()
 
-    kb_ids = {json.loads(l)["chunk_id"] for l in open(args.kb_chunks, encoding="utf-8")}
+    kb_ids = {json.loads(line)["chunk_id"] for line in open(args.kb_chunks, encoding="utf-8")}
     for k, (_, ids) in P.items():
         bad = [c for c in ids if c != "policy" and c not in kb_ids]
         assert not bad, f"{k}: chunk không có trong KB {bad}"

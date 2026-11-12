@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 from gout_llmops.chat.history import tail_history
 
 

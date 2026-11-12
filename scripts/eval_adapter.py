@@ -27,6 +27,7 @@ import yaml
 from gout_llmops.core.config import load_yaml
 from gout_llmops.core.hashing import sha256_file
 from gout_llmops.core.io import read_jsonl, write_json
+from gout_llmops.evaluation.protocol_check import retrieval_mismatch, retrieval_profile
 from gout_llmops.evaluation.reward_v2 import aggregate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,7 +51,8 @@ def generate(args) -> None:
         model_cfg["adapter_path"] = str(d)
         acfg = json.loads((d / "adapter_config.json").read_text(encoding="utf-8"))
         if acfg.get("base_model_name_or_path") not in (None, model_cfg["model_id"]):
-            raise RuntimeError(f"Adapter train trên {acfg['base_model_name_or_path']}, không phải {model_cfg['model_id']}")
+            raise RuntimeError(f"Adapter train trên {acfg['base_model_name_or_path']}, "
+                               f"không phải {model_cfg['model_id']}")
         adapter_info = {"adapter_path": str(d), "adapter_sha256": sha256_file(d / "adapter_model.safetensors"),
                         "lora_r": acfg.get("r"), "lora_dropout": acfg.get("lora_dropout")}
 
@@ -66,7 +68,8 @@ def generate(args) -> None:
     model_yaml.write_text(yaml.safe_dump(model_cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
     eval_yaml.write_text(yaml.safe_dump(eval_cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
     print(f"[PROTOCOL] testset={SPLIT_FILES[args.split]} rag={eval_cfg['rag']} gen={eval_cfg['generation']}")
-    print(f"[MODEL] {model_cfg['model_id']} + {adapter_info['adapter_path'] if adapter_info else 'KHÔNG adapter (gốc)'}")
+    adapter_desc = adapter_info["adapter_path"] if adapter_info else "KHÔNG adapter (gốc)"
+    print(f"[MODEL] {model_cfg['model_id']} + {adapter_desc}")
     if args.dry_run:
         return
 
@@ -81,7 +84,8 @@ def generate(args) -> None:
     write_json(run / "adapter_eval_metadata.json", {
         "name": args.name, "split": args.split, "adapter": adapter_info,
         "testset_sha256": sha256_file(SPLIT_FILES[args.split]), "n_cases": len(cases),
-        "n_turns_expected": len(expected), "n_turns_ok": len(got & expected), "n_errors": len(errors)})
+        "n_turns_expected": len(expected), "n_turns_ok": len(got & expected), "n_errors": len(errors),
+        "retrieval": retrieval_profile(run)})
     Path(f"artifacts/runs/LATEST_{args.name}.txt").write_text(str(run), encoding="utf-8")
     print(f"RUN_DIR={run}")
     if errors or expected - got:
@@ -117,6 +121,10 @@ def gate(args) -> None:
     common = sorted(set(base) & set(cand))
     if len(common) < 0.95 * len(base):
         raise RuntimeError(f"Chỉ {len(common)}/{len(base)} case chung — chấm chưa đủ")
+    mismatch = retrieval_mismatch([args.base, args.candidate], set(common))
+    if mismatch and not args.allow_retrieval_mismatch:
+        raise RuntimeError(f"Hai run khác protocol truy xuất ({mismatch}). So sánh như vậy không công bằng: "
+                           "sinh lại run gốc với cùng retriever (xem notebook 04, bước 0).")
     A = aggregate([base[c] for c in common], cfg)
     B = aggregate([cand[c] for c in common], cfg)
 
@@ -152,7 +160,8 @@ def gate(args) -> None:
           f"candidate {B['reward_weighted_mean']:.4f} | chênh {diff['candidate_minus_base']:+.4f} "
           f"CI95 [{diff['ci95'][0]:+.3f}, {diff['ci95'][1]:+.3f}]")
     for r in rows:
-        print(f"  {'ĐẠT ' if r['pass'] else 'TRƯỢT'}  {r['metric']:<18} {r['candidate']:.4f} {r['op']} {r['limit']:.4f}")
+        verdict = "ĐẠT " if r["pass"] else "TRƯỢT"
+        print(f"  {verdict}  {r['metric']:<18} {r['candidate']:.4f} {r['op']} {r['limit']:.4f}")
     print("KẾT LUẬN:", "ĐẠT" if ok_all else "KHÔNG ĐẠT", "->", args.out)
 
 
@@ -183,6 +192,8 @@ def main() -> None:
     q.add_argument("--severe-tol", type=float, default=0.0,
                    help="mặc định 0: không được có thêm câu safety_risk=3 nào so với base")
     q.add_argument("--out", default="artifacts/reports/gate.json")
+    q.add_argument("--allow-retrieval-mismatch", action="store_true",
+                   help="vẫn so khi hai run khác protocol truy xuất (KHÔNG dùng cho kết luận)")
     args = ap.parse_args()
     os.chdir(ROOT)
     {"generate": generate, "score": score, "gate": gate}[args.cmd](args)

@@ -1,6 +1,8 @@
-import pandas as pd
 import json
 import os
+
+import pandas as pd
+
 
 def main():
     output_dir = "data/raw/testset"
@@ -11,7 +13,7 @@ def main():
     
     print(f"Đang quét tìm {target_filename}...")
     # Tự động quét toàn bộ thư mục từ vị trí hiện tại
-    for root, dirs, files in os.walk("."):
+    for root, _dirs, files in os.walk("."):
         if target_filename in files:
             input_file = os.path.join(root, target_filename)
             break
