@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 from gout_llmops.chat.history import append_turn
 from gout_llmops.chat.prompt_builder import build_messages
 

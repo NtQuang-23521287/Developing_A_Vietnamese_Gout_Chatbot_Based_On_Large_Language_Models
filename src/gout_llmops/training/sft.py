@@ -157,10 +157,14 @@ class AssistantOnlyCollator:
     def __call__(self, samples: list[dict[str, Any]]) -> dict[str, Any]:
         import torch
         longest = max(len(x["input_ids"]) for x in samples)
+
+        def pad(key, value):
+            return torch.tensor([x[key] + [value] * (longest - len(x[key])) for x in samples], dtype=torch.long)
+
         return {
-            "input_ids": torch.tensor([x["input_ids"] + [self.pad_token_id]*(longest-len(x["input_ids"])) for x in samples], dtype=torch.long),
-            "attention_mask": torch.tensor([x["attention_mask"] + [0]*(longest-len(x["attention_mask"])) for x in samples], dtype=torch.long),
-            "labels": torch.tensor([x["labels"] + [-100]*(longest-len(x["labels"])) for x in samples], dtype=torch.long),
+            "input_ids": pad("input_ids", self.pad_token_id),
+            "attention_mask": pad("attention_mask", 0),
+            "labels": pad("labels", -100),
         }
 
 
@@ -244,7 +248,8 @@ def _load_model(family: str, model_cfg: dict[str, Any], max_length: int,
 def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
               smoke_test: bool = False, allow_draft: bool = False) -> None:
     family, model_cfg = identify_model(config)
-    train_file, val_file = config.get("train_data", "data/sft/train.jsonl"), config.get("val_data", "data/sft/val.jsonl")
+    train_file = config.get("train_data", "data/sft/train.jsonl")
+    val_file = config.get("val_data", "data/sft/val.jsonl")
     output_dir = resolve_path(config.get("output_dir", f"artifacts/runs/sft_{family}"))
     max_length = int(config.get("max_seq_length", 2048))
     if max_length < 128:
@@ -292,20 +297,23 @@ def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
     min_ratio = float(config.get("min_fit_ratio", 0.50))
     for entry in [train_report, val_report]:
         if not smoke_test and entry["fit_count"] / entry["original_count"] < min_ratio:
-            raise RuntimeError(f"Too few rows fit token budget in {entry['split']}; consider editing answers, not silent truncate")
+            raise RuntimeError(f"Too few rows fit token budget in {entry['split']}; "
+                               "consider editing answers, not silent truncate")
 
     import torch
     from datasets import Dataset
-    from trl import SFTConfig, SFTTrainer
     from transformers import TrainerCallback
+    from trl import SFTConfig, SFTTrainer
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU required for Unsloth QLoRA training")
     if int(config.get("qlora", {}).get("bits", 4)) != 4:
         raise ValueError("This pipeline uses QLoRA in 4 bits only")
-    model, model_tokenizer = _load_model(family, model_cfg, max_length, config.get("qlora", {}), int(config.get("seed", 2026)))
+    model, model_tokenizer = _load_model(family, model_cfg, max_length, config.get("qlora", {}),
+                                         int(config.get("seed", 2026)))
     # Ensure model's actual tokenizer IDs coincide with preflight tokenizer; otherwise masks corrupt.
     for snippet in ("Thử nghiệm gout", "Bệnh gout có nguy hiểm không?", "assistant"):
-        if model_tokenizer.encode(snippet, add_special_tokens=False) != tokenizer.encode(snippet, add_special_tokens=False):
+        model_ids = model_tokenizer.encode(snippet, add_special_tokens=False)
+        if model_ids != tokenizer.encode(snippet, add_special_tokens=False):
             raise RuntimeError("Tokenizer returned by Unsloth differs from pinned Phase-1 checkpoint")
     cfg = config.get("trainer", {})
     can_bf16 = torch.cuda.is_bf16_supported()
@@ -380,6 +388,7 @@ def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
         "research_only_draft": not medical_reviewed,
         "config": config,
     }
-    (output_dir / "sft_run_metadata.json").write_text(json.dumps(runmeta, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "sft_run_metadata.json").write_text(json.dumps(runmeta, ensure_ascii=False, indent=2),
+                                                      encoding="utf-8")
     print(f"DONE SFT {family}. Adapter at {output_dir}. "
           + ("WARNING: RESEARCH-ONLY draft answers." if not medical_reviewed else ""))

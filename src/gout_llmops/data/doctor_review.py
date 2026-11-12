@@ -74,8 +74,10 @@ DOCTOR_KEYS = ("verdict", "corrected", "error_type", "note")
 GUIDE_LINES = (
     "HƯỚNG DẪN DUYỆT CÂU TRẢ LỜI",
     "",
-    "Mỗi dòng ở sheet \"Duyệt\" là một câu hỏi về bệnh gút (có thể kèm vài lượt hội thoại trước) và câu trả lời do AI viết.",
-    "Những câu trả lời được duyệt sẽ dùng để dạy chatbot tư vấn bệnh gút, nên chatbot sẽ học theo đúng cách trả lời này.",
+    "Mỗi dòng ở sheet \"Duyệt\" là một câu hỏi về bệnh gút (có thể kèm vài lượt hội thoại trước) "
+    "và câu trả lời do AI viết.",
+    "Những câu trả lời được duyệt sẽ dùng để dạy chatbot tư vấn bệnh gút, "
+    "nên chatbot sẽ học theo đúng cách trả lời này.",
     "",
     "VỚI MỖI DÒNG, CHỌN Ở CỘT \"ĐÁNH GIÁ\":",
     "  • Đạt      : đúng, an toàn, có thể dùng nguyên văn.",
@@ -86,14 +88,17 @@ GUIDE_LINES = (
     "",
     "TIÊU CHÍ:",
     "  1. Đúng kiến thức y khoa.",
-    "  2. An toàn: không đưa liều thuốc (mg, số viên) cho người bệnh tự dùng; không khuyên tự mua, tự ngưng, tự tăng, tự đổi thuốc;",
+    "  2. An toàn: không đưa liều thuốc (mg, số viên) cho người bệnh tự dùng; "
+    "không khuyên tự mua, tự ngưng, tự tăng, tự đổi thuốc;",
     "     không chẩn đoán xác định; có cảnh báo khi nào cần đi khám, khi nào cần đi cấp cứu NGAY.",
-    "  3. Trả lời đúng điều người hỏi hỏi, và dùng thông tin họ đã nêu ở các lượt trước (tuổi, bệnh thận, thuốc đang dùng...).",
+    "  3. Trả lời đúng điều người hỏi hỏi, và dùng thông tin họ đã nêu ở các lượt trước "
+    "(tuổi, bệnh thận, thuốc đang dùng...).",
     "  4. Câu hỏi ngoài phạm vi bệnh gút: chatbot nên nói rõ là ngoài phạm vi và khuyên hỏi bác sĩ phù hợp.",
     "",
     "KHI SỬA CÂU TRẢ LỜI:",
     "  • Giữ giọng tư vấn thân thiện, khoảng 80–220 từ; không nêu tên người, tên bệnh viện, địa chỉ, số điện thoại.",
-    "  • Khi trả lời, chatbot chỉ được đọc các đoạn tài liệu ở sheet \"Tài liệu\" (cùng STT). Nên sửa dựa trên các đoạn đó;",
+    "  • Khi trả lời, chatbot chỉ được đọc các đoạn tài liệu ở sheet \"Tài liệu\" (cùng STT). "
+    "Nên sửa dựa trên các đoạn đó;",
     "    nếu cần bổ sung kiến thức không có trong tài liệu, vui lòng ghi rõ ở cột \"Ghi chú\".",
     "  • Không sửa trực tiếp ở cột \"Câu trả lời của AI\"; hãy viết vào cột \"Câu trả lời đã sửa\".",
     "",
@@ -177,7 +182,7 @@ def select_for_review(rows: list[dict[str, Any]], *, per_category: int | None = 
 
 
 def format_history(turns: list[str], answers: list[str]) -> str:
-    parts = [f"Người hỏi: {t}\nAI: {a}" for t, a in zip(turns[:-1], answers[:-1])]
+    parts = [f"Người hỏi: {t}\nAI: {a}" for t, a in zip(turns[:-1], answers[:-1], strict=False)]
     return "\n\n".join(parts)
 
 
@@ -275,7 +280,7 @@ def write_review_xlsx(rows: list[dict[str, Any]], path: str | Path, *, source_fi
     n_docs = max((len(sr["docs"]) for sr in srows), default=3) or 3
     headers = ["STT", "Mã", "Câu hỏi"] + [f"Tài liệu {k}" for k in range(1, n_docs + 1)]
     widths = [6, 16, 40] + [70] * n_docs
-    for j, (h, w) in enumerate(zip(headers, widths), 1):
+    for j, (h, w) in enumerate(zip(headers, widths, strict=True), 1):
         c = put(docs, 1, j, h)
         c.font = bold
         c.fill = grey
@@ -284,7 +289,7 @@ def write_review_xlsx(rows: list[dict[str, Any]], path: str | Path, *, source_fi
         values = [sr["stt"], sr["id"], sr["question"], *sr["docs"]]
         for j, v in enumerate(values, 1):
             put(docs, i, j, v).alignment = wrap
-        docs.row_dimensions[i].height = _row_height([(clean_text(v), w) for v, w in zip(values, widths)])
+        docs.row_dimensions[i].height = _row_height([(clean_text(v), w) for v, w in zip(values, widths, strict=False)])
     docs.freeze_panes = "D2"
     _landscape(docs)
 

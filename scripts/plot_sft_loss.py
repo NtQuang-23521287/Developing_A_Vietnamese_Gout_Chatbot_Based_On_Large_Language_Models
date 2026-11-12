@@ -25,11 +25,11 @@ import zipfile
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # Save figures on servers/Colab without a desktop display.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_QWEN = REPO_ROOT / "artifacts/runs/sft_qwen3_8b_v2"
@@ -272,7 +272,7 @@ def plot_sft_comparison(models: dict[str, str | Path],
                 print(f"       Checkpoint đang tồn tại: {current_ckpt}")
             else:
                 warnings.warn(f"Không tìm thấy best checkpoint trong {root}: {current_ckpt.name}. "
-                              "Có thể checkpoint đã bị xóa bởi save_total_limit.")
+                              "Có thể checkpoint đã bị xóa bởi save_total_limit.", stacklevel=2)
         if old_best and root is not None and Path(old_best) != current_ckpt:
             print("       Ghi chú: best_model_checkpoint trong TrainerState có thể "
                   "chứa đường dẫn cũ trước khi bạn đổi tên run.")
@@ -287,7 +287,7 @@ def plot_sft_comparison(models: dict[str, str | Path],
                 y = df["eval_loss"]
                 if relative:
                     if float(y.iloc[0]) == 0:
-                        warnings.warn(f"Eval loss đầu bằng 0: {label}")
+                        warnings.warn(f"Eval loss đầu bằng 0: {label}", stacklevel=2)
                         continue
                     y = 100 * (y / float(y.iloc[0]) - 1)
             elif kind == "steps":
@@ -297,7 +297,7 @@ def plot_sft_comparison(models: dict[str, str | Path],
             else:
                 df = item["metrics"].dropna(subset=[metric])
                 if df.empty:
-                    warnings.warn(f"Không có {metric} cho {label}")
+                    warnings.warn(f"Không có {metric} cho {label}", stacklevel=2)
                     continue
                 x, y = df["epoch"], df[metric]
             line, = ax.plot(x, y, label=label, marker=(None if kind == "steps" else "o"),

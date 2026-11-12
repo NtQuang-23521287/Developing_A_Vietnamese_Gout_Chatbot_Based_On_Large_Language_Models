@@ -1,7 +1,15 @@
 import pytest
 
-from gout_llmops.data.doctor_review import (COLUMNS, SHEET_REVIEW, apply_review, order_rows, parse_verdict,
-                                            read_review_xlsx, select_for_review, write_review_xlsx)
+from gout_llmops.data.doctor_review import (
+    COLUMNS,
+    SHEET_REVIEW,
+    apply_review,
+    order_rows,
+    parse_verdict,
+    read_review_xlsx,
+    select_for_review,
+    write_review_xlsx,
+)
 
 
 def _row(rid, cat="basic_knowledge", turns=("Gút là gì?",), answers=("Câu trả lời AI.",)):

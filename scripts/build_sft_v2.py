@@ -150,7 +150,7 @@ Trả về JSON: {"questions": [{"q": str, "category": str}]} với category thu
 basic_knowledge (hỏi kiến thức chung), clinical_reasoning (kể tình huống của bản thân và hỏi cách xử trí),
 red_flag (có dấu hiệu cần đi khám NGAY: sốt cao kèm khớp sưng nóng, ban/phồng rộp da khi dùng thuốc, tiêu chảy nặng
 khi dùng colchicine, tophi chảy mủ, đau quặn thận kèm sốt...), safety_trap (người hỏi muốn làm điều nguy hiểm: tự tăng/
-ngưng thuốc, xin liều để tự mua, dùng thuốc chống chỉ định, bỏ thuốc theo lời mách...)."""
+ngưng thuốc, xin liều để tự mua, dùng thuốc chống chỉ định, bỏ thuốc theo lời mách...)."""  # noqa: E501 — prompt gửi LLM: giữ nguyên từng ký tự (cache + nguồn gốc dữ liệu SFT v2)
 
 GEN_DIALOG_SYSTEM = """Bạn viết lời NGƯỜI HỎI trong một hội thoại 3 lượt với chatbot tư vấn bệnh gút, theo KỊCH BẢN BẮT BUỘC.
 Lượt 1: giới thiệu đúng người hỏi, tuổi, tình trạng nền và thuốc đang dùng theo kịch bản (không thêm bệnh khác).
@@ -158,12 +158,13 @@ Lượt 2: kể triệu chứng/tình huống theo kịch bản.
 Lượt 3: hỏi đúng mục đích trong kịch bản, KHÔNG nhắc lại tình trạng nền (để kiểm tra chatbot có nhớ lượt 1 không).
 Viết đúng phong cách được giao, như người thật nhắn tin; mỗi lượt 1–2 câu; không mở đầu lượt 1 bằng mẫu
 "Tôi X tuổi, bị ..., đang dùng ..., không có tiền sử dị ứng" — hãy diễn đạt tự nhiên và khác đi.
-Không nêu tên người, tên bệnh viện. Trả về JSON: {"turns": [str, str, str]}."""
+Không nêu tên người, tên bệnh viện. Trả về JSON: {"turns": [str, str, str]}."""  # noqa: E501 — prompt gửi LLM: giữ nguyên từng ký tự (cache + nguồn gốc dữ liệu SFT v2)
 
 
 # Kịch bản hội thoại: chỉ định trước người hỏi / bệnh nền / mục đích lượt 3 để đa dạng (tránh GPT lặp một khuôn).
 PERSONAS = [("Tôi", (38, 70)), ("Em", (24, 42)), ("Bố tôi", (55, 80)), ("Mẹ tôi (đã mãn kinh)", (55, 80)),
-            ("Chồng tôi", (35, 65)), ("Ông nội em", (70, 88)), ("Cháu hỏi giúp bác", (55, 75)), ("Anh trai tôi", (30, 55))]
+            ("Chồng tôi", (35, 65)), ("Ông nội em", (70, 88)), ("Cháu hỏi giúp bác", (55, 75)),
+            ("Anh trai tôi", (30, 55))]
 CONDITIONS = [  # (mô tả, thuốc đang dùng, từ khóa tìm chunk)
     ("suy thận mạn", "thuốc huyết áp", ["suy thận", "thận"]),
     ("viêm loét dạ dày tá tràng", "thuốc dạ dày", ["dạ dày", "NSAID"]),
@@ -171,7 +172,8 @@ CONDITIONS = [  # (mô tả, thuốc đang dùng, từ khóa tìm chunk)
     ("tiểu đường type 2", "thuốc hạ đường huyết", ["corticoid", "tiểu đường"]),
     ("tăng huyết áp", "thuốc lợi tiểu hydrochlorothiazide", ["lợi tiểu", "thiazid"]),
     ("từng nhồi máu cơ tim", "aspirin liều thấp và thuốc tim mạch", ["tim mạch", "febuxostat", "aspirin"]),
-    ("từng dị ứng nổi ban khi uống allopurinol", "chưa dùng thuốc hạ acid uric", ["dị ứng", "allopurinol", "febuxostat"]),
+    ("từng dị ứng nổi ban khi uống allopurinol", "chưa dùng thuốc hạ acid uric",
+     ["dị ứng", "allopurinol", "febuxostat"]),
     ("đang dùng allopurinol 8 tháng, acid uric đã về mục tiêu", "allopurinol", ["allopurinol", "liên tục", "ULT"]),
     ("có nhiều hạt tophi ở bàn tay", "chưa dùng thuốc hạ acid uric", ["tophi"]),
     ("béo phì, hay uống bia", "không dùng thuốc", ["bia", "rượu", "giảm cân"]),
@@ -179,7 +181,8 @@ CONDITIONS = [  # (mô tả, thuốc đang dùng, từ khóa tìm chunk)
     ("mới bắt đầu allopurinol 2 tuần", "allopurinol", ["allopurinol", "dị ứng", "đợt cấp"]),
 ]
 INTENTS = [  # (mục đích lượt 3, category, từ khóa)
-    ("muốn tự uống thuốc giảm đau kháng viêm (ibuprofen/diclofenac/meloxicam) mua ở tiệm", "safety_trap", ["NSAID", "kháng viêm"]),
+    ("muốn tự uống thuốc giảm đau kháng viêm (ibuprofen/diclofenac/meloxicam) mua ở tiệm", "safety_trap",
+     ["NSAID", "kháng viêm"]),
     ("xin liều colchicine cụ thể để tự mua uống", "safety_trap", ["colchicin"]),
     ("muốn tự ngưng thuốc hạ acid uric vì thấy đỡ", "safety_trap", ["allopurinol", "liên tục"]),
     ("muốn tự tăng gấp đôi liều thuốc đang dùng cho nhanh", "safety_trap", ["liều", "allopurinol"]),
@@ -188,13 +191,15 @@ INTENTS = [  # (mục đích lượt 3, category, từ khóa)
     ("muốn bỏ thuốc bác sĩ kê để uống thuốc nam theo lời mách", "safety_trap", ["điều trị lâu dài", "allopurinol"]),
     ("hỏi có cần dùng thuốc hạ acid uric lâu dài không", "clinical_reasoning", ["chỉ định", "hạ acid uric"]),
     ("hỏi nên ăn uống, sinh hoạt thế nào cho phù hợp với bệnh nền đã kể", "clinical_reasoning", ["chế độ ăn", "purin"]),
-    ("kể thêm dấu hiệu mới nguy hiểm (sốt cao rét run, hoặc nổi ban phồng rộp, hoặc tiêu chảy nhiều lần) và hỏi có tự xử trí ở nhà được không",
+    ("kể thêm dấu hiệu mới nguy hiểm (sốt cao rét run, hoặc nổi ban phồng rộp, hoặc tiêu chảy nhiều lần) "
+     "và hỏi có tự xử trí ở nhà được không",
      "red_flag", ["nhiễm khuẩn", "dị ứng", "tiêu chảy"]),
 ]
 TURN2 = ["đau sưng nóng đỏ khớp ngón chân cái từ đêm qua", "cổ chân sưng đau 2 ngày nay, đi lại khó",
          "đầu gối sưng đau sau bữa nhậu", "mu bàn chân sưng đỏ, đau nhức về đêm",
          "khớp ngón tay sưng đau, tái đi tái lại", "chưa đau nhưng xét nghiệm acid uric cao"]
-STYLES = ["nhắn tin ngắn, ít dấu câu", "lịch sự, kể chi tiết", "lo lắng, hỏi dồn", "giọng người lớn tuổi, xưng hô thân mật"]
+STYLES = ["nhắn tin ngắn, ít dấu câu", "lịch sự, kể chi tiết", "lo lắng, hỏi dồn",
+          "giọng người lớn tuổi, xưng hô thân mật"]
 # Cặp (tình trạng nền, mục đích) đã có trong testset v03 -> KHÔNG tạo để tránh rò rỉ kịch bản
 BLACKLIST = {
     ("viêm loét dạ dày tá tràng", 0), ("suy thận mạn", 0), ("sỏi thận đã tán sỏi", 4), ("suy thận mạn", 4),
@@ -242,7 +247,8 @@ def stage_questions(args, llm: LLM) -> None:
     chunks = read_jsonl(args.kb_chunks)
     rng = random.Random(args.seed)
     for c in chunks:
-        res = llm.json(GEN_Q_SYSTEM, f"ĐOẠN TÀI LIỆU [{c['chunk_id']}]:\n{c['text']}\n\nTạo {args.q_per_chunk} câu hỏi, "
+        res = llm.json(GEN_Q_SYSTEM, f"ĐOẠN TÀI LIỆU [{c['chunk_id']}]:\n{c['text']}\n\n"
+                       f"Tạo {args.q_per_chunk} câu hỏi, "
                        "ưu tiên đa dạng category; nếu tài liệu nói về thuốc hoặc biến chứng thì có ít nhất 1 câu "
                        "red_flag hoặc safety_trap.", "gen_q",
                        {"questions": [{"q": f"[mock] Hỏi về {c['chunk_id']} số {k}?", "category":
@@ -304,11 +310,13 @@ def stage_retrieve(args) -> None:
             return [dict(c) for c in ranked[:3]]
     else:
         import yaml
+
         from gout_llmops.rag.retriever import FaissRetriever
         cfg = yaml.safe_load(Path(args.rag_config).read_text(encoding="utf-8"))
         r = FaissRetriever(cfg["output_dir"], cfg)
         if cfg.get("reranker", {}).get("enabled") and r.reranker is None:
-            raise SystemExit("Reranker không nạp được — context sẽ lệch so với lúc suy luận. Cài FlagEmbedding / dùng GPU.")
+            raise SystemExit("Reranker không nạp được — context sẽ lệch so với lúc suy luận. "
+                             "Cài FlagEmbedding / dùng GPU.")
         retrieve = r.retrieve
     out = []
     for i, q in enumerate(qs, 1):
@@ -351,12 +359,12 @@ BẮT BUỘC:
 - TUYỆT ĐỐI không nêu tên người, tên bệnh viện/phòng khám, địa chỉ, số điện thoại, website, "bài viết này được viết bởi".
 
 Trả về JSON: {"answer": str, "category": str, "used_chunks": [chunk_id]} với category thuộc basic_knowledge,
-clinical_reasoning, red_flag, safety_trap, out_of_scope (phân loại câu hỏi ở lượt cuối)."""
+clinical_reasoning, red_flag, safety_trap, out_of_scope (phân loại câu hỏi ở lượt cuối)."""  # noqa: E501 — prompt gửi LLM: giữ nguyên từng ký tự (cache + nguồn gốc dữ liệu SFT v2)
 
 
 def _messages_for(system_prompt: str, turns: list[str], answers: list[str], contexts: list[list[dict]], i: int):
     history = []
-    for u, a in zip(turns[:i], answers[:i]):
+    for u, a in zip(turns[:i], answers[:i], strict=False):
         history += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
     return build_messages(system_prompt, turns[i], history, contexts[i], MAX_HISTORY_PAIRS)
 
@@ -373,7 +381,8 @@ def stage_answer(args, llm: LLM) -> None:
         for i in range(len(r["turns"])):
             msgs = _messages_for(system_prompt, r["turns"], answers, r["contexts"], i)
             rendered = "\n\n".join(f"<{m['role'].upper()}>\n{m['content']}" for m in msgs)
-            res = llm.json(TEACHER_SYSTEM, "Đây là đúng những gì chatbot nhìn thấy. Hãy viết câu trả lời cho lượt cuối.\n\n"
+            res = llm.json(TEACHER_SYSTEM, "Đây là đúng những gì chatbot nhìn thấy. "
+                           "Hãy viết câu trả lời cho lượt cuối.\n\n"
                            + rendered, "answer",
                            {"answer": f"[mock] Có thể là dấu hiệu của gút; bạn nên khám chuyên khoa Cơ xương khớp. "
                                       f"Đi khám ngay nếu sốt cao. ({r['id']} lượt {i + 1}) " + "nội dung giả lập " * 20,
@@ -412,7 +421,7 @@ CHECK_SYSTEM = """Bạn kiểm tra một câu trả lời mẫu dùng để hu�
  "misses_urgent": bool,         // tình huống nguy hiểm mà không khuyên đi khám/cấp cứu NGAY
  "ignores_history": bool,       // bỏ qua thông tin quan trọng người hỏi đã nêu ở lượt trước
  "answers_question": bool,      // có trả lời đúng điều được hỏi
- "role_ok": bool}               // nói với vai chatbot tư vấn (không nhập vai người bệnh, không viết như bài báo)"""
+ "role_ok": bool}               // nói với vai chatbot tư vấn (không nhập vai người bệnh, không viết như bài báo)"""  # noqa: E501 — prompt gửi LLM: giữ nguyên từng ký tự (cache + nguồn gốc dữ liệu SFT v2)
 
 
 def rule_flags(ans: str) -> list[str]:
@@ -496,7 +505,8 @@ def stage_review_export(args) -> None:
     print(f"Ước tính thời gian bác sĩ: ~{n * 2 / 60:.0f}–{n * 3 / 60:.0f} giờ (2–3 phút/mẫu). "
           "File đã xếp rủi ro cao lên đầu.")
     if n < len(rows):
-        print(f"{len(rows) - n} mẫu không gửi bác sĩ. Khi review_import, dùng --unreviewed keep để vẫn train các mẫu này "
+        print(f"{len(rows) - n} mẫu không gửi bác sĩ. Khi review_import, dùng --unreviewed keep "
+              "để vẫn train các mẫu này "
               "(bản AI đã qua lọc tự động); mặc định drop sẽ bỏ chúng.")
 
 
@@ -507,7 +517,8 @@ def stage_review_import(args) -> None:
     src = WORK / "filtered.jsonl"
     path = _review_file(args)
     if not path.exists():
-        raise SystemExit(f"Không thấy file duyệt {path}. Chạy review_export trước, hoặc chỉ đường dẫn bằng --review-file.")
+        raise SystemExit(f"Không thấy file duyệt {path}. Chạy review_export trước, "
+                         "hoặc chỉ đường dẫn bằng --review-file.")
     records, meta = read_review_xlsx(path)
     src_sha = sha256_file(src)
     if meta.get("source_sha256") and meta["source_sha256"] != src_sha:
@@ -558,7 +569,8 @@ def stage_review_import(args) -> None:
         print(f"[!] {st['n_unreviewed']} mẫu chưa duyệt hoặc không gửi bác sĩ: {policy}.")
         if args.unreviewed == "drop" and st["n_sent_to_doctor"] < st["n_source"]:
             print(f"[!] File duyệt chỉ là mẫu ({st['n_sent_to_doctor']}/{st['n_source']}); với --unreviewed drop, "
-                  f"dữ liệu train chỉ còn khoảng {st['n_approve'] + st['n_edit']} mẫu. Muốn giữ phần không gửi: --unreviewed keep.")
+                  f"dữ liệu train chỉ còn khoảng {st['n_approve'] + st['n_edit']} mẫu. "
+                  "Muốn giữ phần không gửi: --unreviewed keep.")
     if args.dry_run:
         print("(--dry-run: chỉ xem tiến độ, chưa ghi file)")
         return
@@ -643,8 +655,8 @@ def stage_build(args) -> None:
     for f in ("train.jsonl", "val.jsonl"):
         manifest[f"sha256_{f}"] = hashlib.sha256((OUT / f).read_bytes()).hexdigest()
     write_json(OUT / "manifest.json", manifest)
-    print(json.dumps({k: manifest[k] for k in ("n_train", "n_val", "by_category", "multi_turn",
-                                               "answer_words_median", "data_file", "mock")}, ensure_ascii=False, indent=1))
+    keys = ("n_train", "n_val", "by_category", "multi_turn", "answer_words_median", "data_file", "mock")
+    print(json.dumps({k: manifest[k] for k in keys}, ensure_ascii=False, indent=1))
 
 
 def main() -> None:
@@ -665,7 +677,8 @@ def main() -> None:
     rv = ap.add_argument_group("bác sĩ duyệt (review_export / review_import / build)")
     rv.add_argument("--review-file", default=None, help="mặc định artifacts/sft_v2/review/sft_v2_review.xlsx")
     rv.add_argument("--per-category", type=int, default=None,
-                    help="review_export: chỉ gửi bác sĩ tối đa N mẫu ngẫu nhiên mỗi loại câu hỏi (mặc định: gửi tất cả)")
+                    help="review_export: chỉ gửi bác sĩ tối đa N mẫu ngẫu nhiên mỗi loại câu hỏi "
+                         "(mặc định: gửi tất cả)")
     rv.add_argument("--full-categories", default="",
                     help="review_export: các loại gửi TOÀN BỘ dù có --per-category, vd. red_flag,safety_trap")
     rv.add_argument("--reviewer", default="", help="tên/chức danh bác sĩ duyệt, ghi vào manifest")

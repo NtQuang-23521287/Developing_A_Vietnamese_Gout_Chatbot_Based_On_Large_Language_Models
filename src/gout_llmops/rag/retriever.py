@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-import numpy as np
+
 from gout_llmops.core.io import read_jsonl
 
 
@@ -42,7 +42,7 @@ class FaissRetriever:
         ).astype("float32")
         scores, ids = self.index.search(q, retrieve_k)
         candidates = []
-        for score, idx in zip(scores[0].tolist(), ids[0].tolist()):
+        for score, idx in zip(scores[0].tolist(), ids[0].tolist(), strict=True):
             if idx < 0:
                 continue
             row = dict(self.chunks[idx])
@@ -54,7 +54,7 @@ class FaissRetriever:
             rr = self.reranker.compute_score(pairs, normalize=True)
             if not isinstance(rr, list):
                 rr = [rr]
-            for c, s in zip(candidates, rr):
+            for c, s in zip(candidates, rr, strict=True):
                 c["rerank_score"] = float(s)
             candidates.sort(key=lambda x: x.get("rerank_score", -1e9), reverse=True)
         return candidates[:top_k]

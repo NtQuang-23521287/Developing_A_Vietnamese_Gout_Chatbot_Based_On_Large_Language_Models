@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import itertools
-import json
 import random
 from pathlib import Path
 
@@ -43,9 +42,11 @@ def main() -> None:
     ap.add_argument("--out", default="artifacts/reports/compare_v2", help="tiền tố file kết quả .json/.md")
     args = ap.parse_args()
     names = args.names or [Path(r).name for r in args.runs]
+    if len(names) != len(args.runs):
+        ap.error(f"--names có {len(names)} tên nhưng có {len(args.runs)} run")
 
     scored = {}
-    for name, run in zip(names, args.runs):
+    for name, run in zip(names, args.runs, strict=True):
         rows = [r for r in read_jsonl(Path(run) / args.eval_name / "scores.jsonl") if r["status"] == "ok"
                 and (args.split == "all" or r.get("split") == args.split)]
         scored[name] = {r["case_id"]: r for r in rows}

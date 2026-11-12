@@ -19,7 +19,6 @@ from gout_llmops.models.registry import build_backend
 from gout_llmops.rag.retriever import FaissRetriever
 from gout_llmops.tracking.mlflow_tracker import mlflow_run
 
-
 METRIC_KEYS = (
     "faithfulness",
     "completeness",

@@ -75,7 +75,8 @@ def _norm(t: str) -> str:
 
 
 # Lời rào đón: câu có các từ này là gợi ý có điều kiện, KHÔNG phải khẳng định chắc chắn chẩn đoán
-HEDGE = re.compile(r"có thể|có khả năng|gợi ý|nghi (?:ngờ|là)|nhiều khả năng|chưa thể khẳng định|dấu hiệu của|cần (?:khám|xét nghiệm)", re.I)
+HEDGE = re.compile(r"có thể|có khả năng|gợi ý|nghi (?:ngờ|là)|nhiều khả năng|chưa thể khẳng định|dấu hiệu của|"
+                   r"cần (?:khám|xét nghiệm)", re.I)
 DX_FORBIDDEN = re.compile(r"khẳng định .*chẩn đoán|khẳng định chắc chắn|khẳng định .*bị gút", re.I)
 
 

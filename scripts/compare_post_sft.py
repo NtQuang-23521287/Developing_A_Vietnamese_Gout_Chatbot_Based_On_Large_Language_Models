@@ -12,6 +12,7 @@ Writes artifacts/reports/sft_eval_381/base_vs_sft.{md,json}; does NOT
 overwrite the preexisting Phase-2 compare_v2 outputs.
 """
 from __future__ import annotations
+
 import argparse
 import json
 import random
@@ -51,7 +52,7 @@ def weighted_average(rows, field, split=None):
     if not valid:
         raise RuntimeError(f"No cases for split {split}")
     ww = [float(x.get("risk_weight", 1)) for x in valid]
-    return sum(w * float(x["result"][field]) for x, w in zip(valid, ww)) / sum(ww)
+    return sum(w * float(x["result"][field]) for x, w in zip(valid, ww, strict=True)) / sum(ww)
 
 
 def weighted_submetric(rows, group, metric, split=None):
@@ -86,7 +87,8 @@ def main():
     info={name:load_scores((ROOT/path).resolve(), "eval_v2_sft_381" if "SFT" in name else None)
           for name,path in labels.items()}
     ref=set(next(iter(info.values()))[0])
-    protocols={(v[1].get("judge"),v[1].get("judge_version"),v[1].get("reward_version"),v[1].get("testset_sha256")) for v in info.values()}
+    protocols={(v[1].get("judge"),v[1].get("judge_version"),v[1].get("reward_version"),v[1].get("testset_sha256"))
+               for v in info.values()}
     if len(protocols)!=1:
         raise RuntimeError(f"Different Judge/Reward/testset protocols across runs: {protocols}")
     for name,(rows,_) in info.items():
@@ -97,7 +99,7 @@ def main():
             raise RuntimeError(f"Split/risk weights mismatch: {name}")
     results={}
     table=["| Model | All (381) | Dev (114) | Test (267) | Fatal all |", "|---|---:|---:|---:|---:|"]
-    for name,(rows,summary) in info.items():
+    for name,(rows,_summary) in info.items():
         val={s:weighted_average(rows,"reward",s) for s in (None,"dev","test")}
         fatal=sum(bool(r["result"].get("fatal",False)) for r in rows.values())
         risks = {k:weighted_submetric(rows, "P", k) for k in
@@ -126,8 +128,10 @@ def main():
     for family,splits in comparisons.items():
         for split,v in splits.items():
             lo,hi=v["ci95"]
-            lines.append(f"- {family}, {split or 'all'}: SFT−Base = {v['sft_minus_base']:+.4f}; CI95 [{lo:+.4f}, {hi:+.4f}] (n={v['n']})")
-    lines += ["", "Warning: Testset may contain a training-data overlap. The judge is automated, not a medical validation."]
+            lines.append(f"- {family}, {split or 'all'}: SFT−Base = {v['sft_minus_base']:+.4f}; "
+                         f"CI95 [{lo:+.4f}, {hi:+.4f}] (n={v['n']})")
+    lines += ["", "Warning: Testset may contain a training-data overlap. "
+                  "The judge is automated, not a medical validation."]
     (output/"base_vs_sft.md").write_text("\n".join(lines)+"\n",encoding="utf-8")
     print("\n".join(lines))
     print("\nSaved to:",output)

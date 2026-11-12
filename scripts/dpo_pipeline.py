@@ -36,12 +36,23 @@ import yaml
 from gout_llmops.core.config import load_yaml
 from gout_llmops.core.hashing import sha256_file
 from gout_llmops.core.io import read_jsonl, write_json, write_jsonl
-from gout_llmops.evaluation.judge_v2 import (JUDGE_VERSION, MockJudge, OpenAIJudgeV2, build_judge_input,
-                                             validate_judge_output)
+from gout_llmops.evaluation.judge_v2 import (
+    JUDGE_VERSION,
+    MockJudge,
+    OpenAIJudgeV2,
+    build_judge_input,
+    validate_judge_output,
+)
 from gout_llmops.evaluation.reward_v2 import compute_reward_v2, validate_config
 from gout_llmops.training.dpo import check_adapter_dir, resolve_policy
-from gout_llmops.training.preference import (DEFAULT_RULE, RULE_VERSION, labels_for, mine_pair, prompt_messages,
-                                             select_prompts)
+from gout_llmops.training.preference import (
+    DEFAULT_RULE,
+    RULE_VERSION,
+    labels_for,
+    mine_pair,
+    prompt_messages,
+    select_prompts,
+)
 
 SYSTEM_PROMPT_PATH = "prompts/system_vi_v1.txt"
 MODEL_CONFIG = "configs/models/qwen3_8b.yaml"
@@ -181,7 +192,8 @@ def stage_generate(args, P: Paths) -> None:
             _append_jsonl(P.cands, record(r, cands[j], int(n_in[j])))
         n_done += len(batch)
         el = time.time() - t0
-        print(f"  {len(done) + n_done}/{len(selected)} | {el / n_done:.1f}s/câu | còn ~{el / n_done * (len(todo) - n_done) / 60:.0f} phút",
+        print(f"  {len(done) + n_done}/{len(selected)} | {el / n_done:.1f}s/câu | "
+              f"còn ~{el / n_done * (len(todo) - n_done) / 60:.0f} phút",
               flush=True)
     print(f"Xong -> {P.cands}")
 
@@ -206,7 +218,7 @@ def stage_score(args, P: Paths) -> None:
 
     jobs = []
     for r in rows:
-        history = list(zip(r["turns"][:-1], r["teacher_answers"][:-1]))
+        history = list(zip(r["turns"][:-1], r["teacher_answers"][:-1], strict=False))
         reference = {"reference_answer": r["teacher_answers"][-1]}
         for c in r["candidates"]:
             ui = build_judge_input(question_type=r["question_type"], risk_level=r["risk_level"],
@@ -249,7 +261,8 @@ def stage_score(args, P: Paths) -> None:
     pin, pout = PRICE_PER_M.get(args.judge_model, (0, 0))
     print(f"\nĐã chấm {len(ok)}/{len(flat)} | lỗi {len(flat) - len(ok)} -> {P.scored}")
     if ok:
-        print(f"Reward TB {mean(c['reward'] for c in ok):.3f} | đạt (≥0.5) {sum(c['reward'] >= 0.5 for c in ok) / len(ok):.1%}"
+        print(f"Reward TB {mean(c['reward'] for c in ok):.3f} | "
+              f"đạt (≥0.5) {sum(c['reward'] >= 0.5 for c in ok) / len(ok):.1%}"
               f" | fatal {sum(c['fatal'] for c in ok)} | cắt cụt {sum(c.get('truncated', False) for c in ok)}")
     print(f"Judge: {u} | chi phí ước tính ${u['input_tokens'] / 1e6 * pin + u['output_tokens'] / 1e6 * pout:.3f}")
     if len(ok) < len(flat):
@@ -310,7 +323,8 @@ def main() -> None:
     g.add_argument("--k", type=int, default=4, help="số ứng viên mỗi câu (đề cương: 3–5)")
     g.add_argument("--max-prompts", type=int, default=300)
     g.add_argument("--batch-prompts", type=int, default=2, help="số câu hỏi sinh song song (×k chuỗi); L4/A100 dùng 4")
-    g.add_argument("--include-greedy", action="store_true", help="1 trong k ứng viên là câu greedy (giống lúc đánh giá)")
+    g.add_argument("--include-greedy", action="store_true",
+                   help="1 trong k ứng viên là câu greedy (giống lúc đánh giá)")
     g.add_argument("--temperature", type=float, default=0.8)
     g.add_argument("--top-p", type=float, default=0.95)
     g.add_argument("--top-k", type=int, default=50)
@@ -327,7 +341,8 @@ def main() -> None:
     m.add_argument("--min-chosen-reward", type=float, default=DEFAULT_RULE["min_chosen_reward"])
     m.add_argument("--min-margin", type=float, default=DEFAULT_RULE["min_margin"])
     m.add_argument("--max-chosen-risk", type=int, default=DEFAULT_RULE["max_chosen_risk"])
-    m.add_argument("--teacher-fallback", action=argparse.BooleanOptionalAction, default=DEFAULT_RULE["teacher_fallback"])
+    m.add_argument("--teacher-fallback", action=argparse.BooleanOptionalAction,
+                   default=DEFAULT_RULE["teacher_fallback"])
     m.add_argument("--reward-config", default="configs/evaluation/heuristic_reward_v2.yaml")
     m.add_argument("--mock", action="store_true")
     t = sub.add_parser("train")

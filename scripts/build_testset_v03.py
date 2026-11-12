@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import random
 import re
 from collections import Counter, defaultdict

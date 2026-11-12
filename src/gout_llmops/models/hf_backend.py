@@ -10,7 +10,6 @@ class HuggingFaceBackend(ModelBackend):
     def __init__(self, config: dict):
         try:
             import torch
-
             from transformers import (
                 AutoModelForCausalLM,
                 AutoProcessor,

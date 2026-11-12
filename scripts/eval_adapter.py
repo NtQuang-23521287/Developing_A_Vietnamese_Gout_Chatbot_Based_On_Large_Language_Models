@@ -50,7 +50,8 @@ def generate(args) -> None:
         model_cfg["adapter_path"] = str(d)
         acfg = json.loads((d / "adapter_config.json").read_text(encoding="utf-8"))
         if acfg.get("base_model_name_or_path") not in (None, model_cfg["model_id"]):
-            raise RuntimeError(f"Adapter train trên {acfg['base_model_name_or_path']}, không phải {model_cfg['model_id']}")
+            raise RuntimeError(f"Adapter train trên {acfg['base_model_name_or_path']}, "
+                               f"không phải {model_cfg['model_id']}")
         adapter_info = {"adapter_path": str(d), "adapter_sha256": sha256_file(d / "adapter_model.safetensors"),
                         "lora_r": acfg.get("r"), "lora_dropout": acfg.get("lora_dropout")}
 
@@ -66,7 +67,8 @@ def generate(args) -> None:
     model_yaml.write_text(yaml.safe_dump(model_cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
     eval_yaml.write_text(yaml.safe_dump(eval_cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
     print(f"[PROTOCOL] testset={SPLIT_FILES[args.split]} rag={eval_cfg['rag']} gen={eval_cfg['generation']}")
-    print(f"[MODEL] {model_cfg['model_id']} + {adapter_info['adapter_path'] if adapter_info else 'KHÔNG adapter (gốc)'}")
+    adapter_desc = adapter_info["adapter_path"] if adapter_info else "KHÔNG adapter (gốc)"
+    print(f"[MODEL] {model_cfg['model_id']} + {adapter_desc}")
     if args.dry_run:
         return
 
@@ -152,7 +154,8 @@ def gate(args) -> None:
           f"candidate {B['reward_weighted_mean']:.4f} | chênh {diff['candidate_minus_base']:+.4f} "
           f"CI95 [{diff['ci95'][0]:+.3f}, {diff['ci95'][1]:+.3f}]")
     for r in rows:
-        print(f"  {'ĐẠT ' if r['pass'] else 'TRƯỢT'}  {r['metric']:<18} {r['candidate']:.4f} {r['op']} {r['limit']:.4f}")
+        verdict = "ĐẠT " if r["pass"] else "TRƯỢT"
+        print(f"  {verdict}  {r['metric']:<18} {r['candidate']:.4f} {r['op']} {r['limit']:.4f}")
     print("KẾT LUẬN:", "ĐẠT" if ok_all else "KHÔNG ĐẠT", "->", args.out)
 
 

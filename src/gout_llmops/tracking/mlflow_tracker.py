@@ -15,6 +15,6 @@ def mlflow_run(config: dict, run_name: str, params: dict):
         return
     mlflow.set_tracking_uri(config.get("tracking_uri", "file:./mlruns"))
     mlflow.set_experiment(config.get("experiment_name", "gout_llmops"))
-    with mlflow.start_run(run_name=run_name) as run:
+    with mlflow.start_run(run_name=run_name):
         mlflow.log_params({k: v for k, v in params.items() if v is not None})
         yield mlflow

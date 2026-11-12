@@ -40,7 +40,8 @@ def check_adapter_dir(path: str | Path) -> Path:
     if not (d / "adapter_config.json").is_file() or not weights.is_file():
         raise FileNotFoundError(f"Không thấy adapter LoRA hợp lệ tại {d}")
     if weights.stat().st_size < 10_000:
-        raise RuntimeError(f"{weights} chỉ là con trỏ Git LFS (chưa tải file thật). Chạy `git lfs pull` hoặc copy từ Drive.")
+        raise RuntimeError(f"{weights} chỉ là con trỏ Git LFS (chưa tải file thật). "
+                           "Chạy `git lfs pull` hoặc copy từ Drive.")
     return d
 
 
@@ -130,7 +131,8 @@ def train_dpo(config: dict[str, Any], *, smoke_test: bool = False,
     if not data:
         raise ValueError("Không có cặp nào vừa max_length")
     if overlong / len(rows) > 0.10:
-        raise RuntimeError(f"{overlong}/{len(rows)} cặp vượt max_length={max_length}; tăng max_length thay vì bỏ âm thầm")
+        raise RuntimeError(f"{overlong}/{len(rows)} cặp vượt max_length={max_length}; "
+                           "tăng max_length thay vì bỏ âm thầm")
     train_rows, eval_rows = _split_train_eval(data, float(config.get("eval_ratio", 0.1)), seed)
     if smoke_test:
         train_rows, eval_rows = train_rows[:4], eval_rows[:2]

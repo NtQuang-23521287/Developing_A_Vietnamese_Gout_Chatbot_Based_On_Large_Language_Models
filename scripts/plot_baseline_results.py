@@ -10,12 +10,14 @@ or artifacts/runs/<run>/{summary.json,scores.jsonl} (the current zipped export).
 No OpenAI API or GPU is needed.
 """
 from __future__ import annotations
+
 import argparse
 import itertools
 import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -127,10 +129,12 @@ def summarize(data, split):
         'rates': {k: wavg([float(r['raw'][k.split('>=')[0]]) >= int(k.split('>=')[1]) for r in rows], weights)
                   for k in RATE_KEYS},
         'by_type': {k: (wavg([r['result']['reward'] for r in rows if r['question_type']==k],
-                            [r['risk_weight'] for r in rows if r['question_type']==k]) if any(r['question_type']==k for r in rows)
+                            [r['risk_weight'] for r in rows if r['question_type']==k])
+                        if any(r['question_type']==k for r in rows)
                         else float('nan')) for k in QTYPE},
         'by_risk': {k: (wavg([r['result']['reward'] for r in rows if r['risk_level']==k],
-                            [r['risk_weight'] for r in rows if r['risk_level']==k]) if any(r['risk_level']==k for r in rows)
+                            [r['risk_weight'] for r in rows if r['risk_level']==k])
+                        if any(r['risk_level']==k for r in rows)
                         else float('nan')) for k in RISK_LEVEL},
         'n_type': {k: sum(r['question_type']==k for r in rows) for k in QTYPE},
         'n_risk': {k: sum(r['risk_level']==k for r in rows) for k in RISK_LEVEL},
@@ -144,7 +148,8 @@ def save(fig, outdir, fname):
     plt.close(fig)
 
 
-def grouped_bars(models, labels, value_fn, ylabel, title, outdir, fname, ylim=None, label_values=False, xticklabels=None):
+def grouped_bars(models, labels, value_fn, ylabel, title, outdir, fname, ylim=None, label_values=False,
+                 xticklabels=None):
     n = len(labels)
     x = np.arange(n)
     width = 0.24
@@ -153,7 +158,7 @@ def grouped_bars(models, labels, value_fn, ylabel, title, outdir, fname, ylim=No
         vals = np.asarray([value_fn(model, k) for k in labels], dtype=float)
         bar = ax.bar(x + (mi-1)*width, vals, width, label=model)
         if label_values:
-            for rect, val in zip(bar, vals):
+            for rect, val in zip(bar, vals, strict=True):
                 if np.isfinite(val):
                     ax.text(rect.get_x() + rect.get_width()/2, rect.get_height(), f'{val:.2f}',
                             ha='center', va='bottom', fontsize=8)
@@ -197,12 +202,13 @@ def plot_all(root, outdir, split, n_boot=5000):
     hi = [sums[m]['ci_hi']-sums[m]['reward'] for m in model_order]
     fig,ax=plt.subplots(figsize=(9,5.8))
     bars=ax.bar(model_order,rewards,yerr=np.asarray([lo,hi]),capsize=6)
-    for b,m,v in zip(bars,model_order,rewards):
+    for b,m,v in zip(bars,model_order,rewards,strict=True):
         ax.text(b.get_x()+b.get_width()/2, sums[m]['ci_hi']+0.016, f'{v:.4f}',ha='center',fontsize=10)
     ax.set_ylim(0, min(1.04,max(sums[m]['ci_hi'] for m in model_order)+0.13))
     ax.set_ylabel('Risk-weighted mean Reward v2')
     ax.set_title(f'Overall Reward v2 (n={n} cases; 95% bootstrap CI)')
-    ax.grid(axis='y',alpha=0.25);ax.set_axisbelow(True)
+    ax.grid(axis='y',alpha=0.25)
+    ax.set_axisbelow(True)
     save(fig,outdir,'01_overall_reward')
 
     # Chart 2: 6 quality metrics normalized from 1..5 to 0..1.
@@ -227,7 +233,8 @@ def plot_all(root, outdir, split, n_boot=5000):
     ax.set_xlabel('Mean generation latency (seconds per turn)')
     ax.set_ylabel('Risk-weighted mean Reward v2')
     ax.set_title(f'Reward vs. Generation Latency ({split} cases)')
-    ax.grid(alpha=0.25);ax.legend(frameon=False)
+    ax.grid(alpha=0.25)
+    ax.legend(frameon=False)
     save(fig,outdir,'04_reward_vs_latency')
 
     # Chart 5 replaces old disease groups with actual v03 question_type.
@@ -310,7 +317,8 @@ def plot_all(root, outdir, split, n_boot=5000):
         'testset_sha256':dataset[model_order[0]]['summary']['testset_sha256'],
         'methodology':{
             'reward':'Risk-level-weighted mean, not simple mean.',
-            'confidence_interval':'For all use original judge summary CI95; for split use 5000 percentile bootstrap resamples (seed 2026).',
+            'confidence_interval':('For all use original judge summary CI95; '
+                                   'for split use 5000 percentile bootstrap resamples (seed 2026).'),
             'quality':'Normalized M=(raw_score-1)/4, risk-weighted.',
             'risk':'Raw 0..3 risk metric, risk-weighted.',
             'rates':'Risk-level weighted case rate with threshold.',
@@ -319,8 +327,11 @@ def plot_all(root, outdir, split, n_boot=5000):
             'caveat':'Includes data-driven model judge ratings, not clinician-validated medical safety.'}}
     (outdir/'metadata.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding='utf-8')
     print(f'PASS: generated 9 charts PNG+SVG and 2 tables under {outdir} (n={n})')
-    print(pd.DataFrame(tab)[['Model','Cases','Reward weighted','CI95 low','CI95 high','Fatal cases','Mean latency seconds per turn']].to_string(index=False))
-    print(pd.DataFrame(comparison)[['Model A','Model B','Mean difference (A-B)','Paired CI95 lower','Paired CI95 upper','Wilcoxon p (unweighted)']].to_string(index=False))
+    tab_cols = ['Model','Cases','Reward weighted','CI95 low','CI95 high','Fatal cases','Mean latency seconds per turn']
+    print(pd.DataFrame(tab)[tab_cols].to_string(index=False))
+    cmp_cols = ['Model A','Model B','Mean difference (A-B)','Paired CI95 lower','Paired CI95 upper',
+                'Wilcoxon p (unweighted)']
+    print(pd.DataFrame(comparison)[cmp_cols].to_string(index=False))
 
 
 def main():

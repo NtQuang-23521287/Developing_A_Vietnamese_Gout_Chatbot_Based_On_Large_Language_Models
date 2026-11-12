@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+
 from gout_llmops.core.config import load_yaml
 from gout_llmops.training.sft import train_sft
 
@@ -18,7 +19,8 @@ def main():
     g = p.add_mutually_exclusive_group()
     g.add_argument("--preflight-only", action="store_true", help="Audit tokens; no CUDA training")
     g.add_argument("--smoke-test", action="store_true", help="2 GPU steps, no adapter saved")
-    p.add_argument("--full-test", action="store_true", help="Explicitly authorize RESEARCH-ONLY full train on unreviewed QA")
+    p.add_argument("--full-test", action="store_true",
+                   help="Explicitly authorize RESEARCH-ONLY full train on unreviewed QA")
     args = p.parse_args()
     cfg = args.config or CONFIGS[args.model]
     data = load_yaml(cfg)
