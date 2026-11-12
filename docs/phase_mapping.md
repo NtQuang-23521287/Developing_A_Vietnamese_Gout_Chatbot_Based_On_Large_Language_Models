@@ -26,3 +26,6 @@ Generate K candidates, score with heuristic reward, mine Chosen/Rejected, DPO tr
 ## Phase 5 — Safety & Release
 
 Calibrate uncertainty threshold on development data, enable safe refusal, run final acceptance on a separately managed final test set, then package API/UI.
+
+Safe Inference v1 (guard theo luật + MC Dropout trên LoRA + hiệu chỉnh ngưỡng trên dev): `docs/safe_inference.md`,
+`scripts/safe_inference.py`, `notebooks/05_safe_inference_colab.ipynb`.

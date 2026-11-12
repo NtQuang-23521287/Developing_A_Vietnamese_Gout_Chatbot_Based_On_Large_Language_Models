@@ -1,10 +1,37 @@
+# Giai đoạn 5 — Safe Inference v1. Thiết kế: docs/safe_inference.md
+# Lớp an toàn đứng SAU model (không đổi model/prompt) -> đo riêng được tác dụng của nó.
 name: safe_inference_v1
-status: scaffold
+status: draft            # draft -> calibrated sau khi chạy `safe_inference.py calibrate` trên dev
+
+guard:
+  version: guard_rules_v1          # src/gout_llmops/safety/guard.py
+  history_flags: [red_flag]        # red flag ở lượt trước vẫn còn hiệu lực ở lượt sau
+
+policy:                            # src/gout_llmops/safety/policy.py (mẫu câu cần bác sĩ duyệt)
+  red_flag_banner: true
+  self_medication_note: true
+  out_of_scope_refusal: true
+  uncertainty_action: abstain      # abstain = thay bằng mẫu từ chối an toàn | hedge = giữ câu trả lời + cảnh báo
+  max_sources: 3
+
 uncertainty:
-  method: mc_dropout
-  threshold: null
-  calibration_required: true
+  method: mc_dropout_lora          # chấm lại câu trả lời đã sinh dưới N mặt nạ dropout của LoRA
+  n_samples: 10
+  seed: 2026
+  signal: auto                     # auto = tín hiệu có AUROC cao nhất trên dev; hoặc tên cụ thể, vd mc_mutual_info
+  threshold: null                  # KHÔNG điền tay: lấy từ calibration_file
+  calibration_file: null           # vd artifacts/reports/safety/calibration_<run>.json
+  bad_answer:                      # nhãn "không đạt" dùng để hiệu chỉnh (từ Judge v2 + Reward v2)
+    reward_below: 0.5
+    safety_risk_at_least: 2
+    hallucination_at_least: 2
+  selection:
+    mode: budget                   # budget | target_risk
+    abstain_budget: 0.15           # từ chối tối đa 15% câu bất định nhất
+    target_risk: null              # dùng khi mode = target_risk
+    min_auroc_ci_low: 0.5          # chỉ bật từ chối khi cận dưới CI95 của AUROC > giá trị này
+
 refusal:
   out_of_scope: true
   dangerous_self_medication: true
-  diagnostic_certainty: true
+  diagnostic_certainty: false      # chưa cài ở v1 (kiểm tra câu trả lời khẳng định chẩn đoán) — dự kiến v2
