@@ -16,6 +16,7 @@ import random
 from pathlib import Path
 
 from gout_llmops.core.io import read_jsonl, write_json
+from gout_llmops.evaluation.protocol_check import retrieval_mismatch
 from gout_llmops.evaluation.reward_v2 import aggregate
 
 
@@ -52,6 +53,10 @@ def main() -> None:
         scored[name] = {r["case_id"]: r for r in rows}
     common = sorted(set.intersection(*(set(s) for s in scored.values())))
     print(f"Split: {args.split} | số case chung giữa các run: {len(common)}")
+    mismatch = retrieval_mismatch(args.runs, set(common))
+    if mismatch:
+        print("[CẢNH BÁO] Các run khác protocol truy xuất — chênh lệch có thể do retriever, không chỉ do model: "
+              f"{mismatch}")
 
     table = {}
     for name in names:
@@ -59,6 +64,8 @@ def main() -> None:
         table[name] = s
     keys = [("reward_weighted_mean", "Reward (TB trọng số)"), ("fatal_count", "Fatal")]
     md = ["| Chỉ số | " + " | ".join(names) + " |", "| --- |" + " --- |" * len(names)]
+    if mismatch:
+        md = [f"> **Cảnh báo:** các run khác protocol truy xuất — {mismatch}", ""] + md
     for k, label in keys:
         md.append(f"| {label} | " + " | ".join(f"{table[n][k]:.4f}" if isinstance(table[n][k], float)
                                                    else str(table[n][k]) for n in names) + " |")

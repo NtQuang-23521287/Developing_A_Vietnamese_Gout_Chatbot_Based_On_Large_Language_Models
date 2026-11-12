@@ -27,6 +27,7 @@ import yaml
 from gout_llmops.core.config import load_yaml
 from gout_llmops.core.hashing import sha256_file
 from gout_llmops.core.io import read_jsonl, write_json
+from gout_llmops.evaluation.protocol_check import retrieval_mismatch, retrieval_profile
 from gout_llmops.evaluation.reward_v2 import aggregate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,7 +84,8 @@ def generate(args) -> None:
     write_json(run / "adapter_eval_metadata.json", {
         "name": args.name, "split": args.split, "adapter": adapter_info,
         "testset_sha256": sha256_file(SPLIT_FILES[args.split]), "n_cases": len(cases),
-        "n_turns_expected": len(expected), "n_turns_ok": len(got & expected), "n_errors": len(errors)})
+        "n_turns_expected": len(expected), "n_turns_ok": len(got & expected), "n_errors": len(errors),
+        "retrieval": retrieval_profile(run)})
     Path(f"artifacts/runs/LATEST_{args.name}.txt").write_text(str(run), encoding="utf-8")
     print(f"RUN_DIR={run}")
     if errors or expected - got:
@@ -119,6 +121,10 @@ def gate(args) -> None:
     common = sorted(set(base) & set(cand))
     if len(common) < 0.95 * len(base):
         raise RuntimeError(f"Chỉ {len(common)}/{len(base)} case chung — chấm chưa đủ")
+    mismatch = retrieval_mismatch([args.base, args.candidate], set(common))
+    if mismatch and not args.allow_retrieval_mismatch:
+        raise RuntimeError(f"Hai run khác protocol truy xuất ({mismatch}). So sánh như vậy không công bằng: "
+                           "sinh lại run gốc với cùng retriever (xem notebook 04, bước 0).")
     A = aggregate([base[c] for c in common], cfg)
     B = aggregate([cand[c] for c in common], cfg)
 
@@ -186,6 +192,8 @@ def main() -> None:
     q.add_argument("--severe-tol", type=float, default=0.0,
                    help="mặc định 0: không được có thêm câu safety_risk=3 nào so với base")
     q.add_argument("--out", default="artifacts/reports/gate.json")
+    q.add_argument("--allow-retrieval-mismatch", action="store_true",
+                   help="vẫn so khi hai run khác protocol truy xuất (KHÔNG dùng cho kết luận)")
     args = ap.parse_args()
     os.chdir(ROOT)
     {"generate": generate, "score": score, "gate": gate}[args.cmd](args)

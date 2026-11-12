@@ -25,13 +25,19 @@ class FaissRetriever:
         self.reranker = None
         rerank = rag_config.get("reranker", {})
         if rerank.get("enabled"):
+            # KHÔNG được âm thầm bỏ reranker: trước đây lỗi nạp bị nuốt nên các run testset v03 (2026-10-25,
+            # SFT v1) chạy không có reranker trong khi config bật -> protocol lệch mà không ai biết.
             try:
                 from FlagEmbedding import FlagReranker
                 self.reranker = FlagReranker(
                     rerank["model_id"], use_fp16=True, trust_remote_code=True
                 )
-            except Exception:
-                self.reranker = None
+            except Exception as e:
+                raise RuntimeError(
+                    f"Config bật reranker ({rerank.get('model_id')}) nhưng không nạp được: {type(e).__name__}: {e}. "
+                    "Sửa môi trường (pip install FlagEmbedding, phiên bản transformers tương thích) "
+                    "hoặc tắt reranker trong config một cách tường minh."
+                ) from e
 
     def retrieve(self, query: str) -> list[dict[str, Any]]:
         rcfg = self.cfg["retrieval"]
