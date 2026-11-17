@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 MODELS = {
-    "qwen3": {"id": "Qwen/Qwen3-8B", "file": "configs/models/qwen3_8b.yaml", "end": "<|im_end|>"},
-    "gemma3": {"id": "google/gemma-3-4b-it", "file": "configs/models/gemma3_4b.yaml", "end": "<end_of_turn>"},
+    "qwen3": {"id": "Qwen/Qwen3-8B", "file": "configs/models/qwen3_8b_v3.yaml", "end": "<|im_end|>"},
+    "gemma3": {"id": "google/gemma-3-4b-it", "file": "configs/models/gemma3_4b_v3.yaml", "end": "<end_of_turn>"},
 }
 
 
@@ -248,9 +248,9 @@ def _load_model(family: str, model_cfg: dict[str, Any], max_length: int,
 def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
               smoke_test: bool = False, allow_draft: bool = False) -> None:
     family, model_cfg = identify_model(config)
-    train_file = config.get("train_data", "data/sft/train.jsonl")
-    val_file = config.get("val_data", "data/sft/val.jsonl")
-    output_dir = resolve_path(config.get("output_dir", f"artifacts/runs/sft_{family}"))
+    train_file = config.get("train_data", "data/sft_v2/train.jsonl")
+    val_file = config.get("val_data", "data/sft_v2/val.jsonl")
+    output_dir = resolve_path(config.get("output_dir", f"artifacts/runs/sft_{family}_v2"))
     max_length = int(config.get("max_seq_length", 2048))
     if max_length < 128:
         raise ValueError("max_seq_length must be >= 128")
