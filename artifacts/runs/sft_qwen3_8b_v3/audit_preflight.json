@@ -1,0 +1,31 @@
+{
+  "model_family": "qwen3",
+  "model_id": "Qwen/Qwen3-8B",
+  "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "max_seq_length": 3072,
+  "medical_answers_approved": false,
+  "research_only_draft": true,
+  "train_sha256": "5a9249207391c707ffacbec8394807b124530945eb0310c9d0d88f8d76a28310",
+  "val_sha256": "36799dd09a73c5dd08cef6d850e677c581200db9239da83c6fd011b9bdde168a",
+  "train": {
+    "split": "train",
+    "original_count": 136,
+    "fit_count": 136,
+    "dropped_overlong": 0,
+    "mean_tokens": 1257.8,
+    "min_tokens": 886,
+    "max_tokens": 1822,
+    "overlong_rows": []
+  },
+  "val": {
+    "split": "val",
+    "original_count": 15,
+    "fit_count": 15,
+    "dropped_overlong": 0,
+    "mean_tokens": 1249.5,
+    "min_tokens": 989,
+    "max_tokens": 1739,
+    "overlong_rows": []
+  },
+  "length_policy": "drop"
+}
