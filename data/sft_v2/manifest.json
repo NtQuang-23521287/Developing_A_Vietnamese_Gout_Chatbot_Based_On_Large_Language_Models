@@ -1,0 +1,25 @@
+{
+  "version": "sft_v2_151_doctor_feedback_RESEARCH",
+  "generated_at": "2026-11-16",
+  "seed": 2026,
+  "n_total": 151,
+  "n_train": 136,
+  "n_val": 15,
+  "by_category": {
+    "red_flag": 71,
+    "safety_trap": 20,
+    "clinical_reasoning": 20,
+    "out_of_scope": 20,
+    "basic_knowledge": 20
+  },
+  "original_teacher": "gpt-4.1-mini",
+  "source": "Doctor Excel original 151",
+  "doctor_red_cases": 17,
+  "answer_rewrites_from_doctor_notes": 14,
+  "history_edits_from_doctor_notes": 3,
+  "explicitly_physician_approved": 0,
+  "medical_status": "RESEARCH DATA ONLY — the physician left all 151 verdict fields empty. Edits were integrated by an AI and are not independently approved by doctor.",
+  "rag_context": "Only 3 review excerpts (up to 700 characters each), NOT the full retrieved FAISS chunks; may deviate from inference",
+  "format": "RAG-aware chat messages; loss intended only on the last assistant turn, matching build_sft_v2.py",
+  "cautions": "Do not deploy for patient-facing care; physician final confirmation remains outstanding"
+}

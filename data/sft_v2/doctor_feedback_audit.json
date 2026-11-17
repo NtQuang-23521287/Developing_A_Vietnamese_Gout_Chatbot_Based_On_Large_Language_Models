@@ -1,0 +1,155 @@
+[
+  {
+    "stt": 3,
+    "id": "dlg_053",
+    "doctor_red_notes": {
+      "history": "huốc hạ acid uric như colchicine COLCHICINE KHÔNG PHẢI THUỐC ĐIỀU TRỊ HẠ ACID URIC https://trungtamthuoc.com/hoat-chat nguồn DƯỢC THƯ QUỐC GIA 2022"
+    },
+    "action": "AI normalization of history from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 26,
+    "id": "kbq_doc001_chunk0007_1",
+    "doctor_red_notes": {
+      "answer": "Tuyệt đối không tự ý ngưng CÓ DẤU HIỆU DỊ ỨNG HOẶC NGỌ ĐỘC THUỐC PHẢI NGƯNG THUỐC VÀ ĐI KHÁM CƠ SỞ Y TẾ GẦN NHẤT"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 34,
+    "id": "kbq_doc001_chunk0018_1",
+    "doctor_red_notes": {
+      "answer": "tránh tự ý ngưng hoặc thay đổi liều DẤU HIỆU ĐAU BỤNG VÀ TIÊU CHẢY NHIỀU LÀ DẤU HIỆU CẢNH BÁO NGUY HIỂM NGỘ ĐỘC HAY QUÁ LIỀU THUỐC CẦN NGƯNG THUỐC VÀ ĐI KHÁM Ở CƠ SỞ Y TẾ GẦN NHẤT"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 36,
+    "id": "kbq_doc003_chunk0000_0",
+    "doctor_red_notes": {
+      "answer": "ĐÃ TIÊU CHẢY NẶNG NÊN NGƯNG THUỐC NGÀY VÀ ĐI KHÁM BS CHUYÊN KHOA HOẶC CẤP CÚU VÌ NGUY CƠ MẤT NUƯỚC NẶNG"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 46,
+    "id": "kbq_doc003_chunk0014_2",
+    "doctor_red_notes": {
+      "answer": "không nên tự ý ngưng thuốc ( NẾU TÁC DỤNG PHỤ NẶNG VÀ BIỂU HIỆN CỦA DỊ ỨNG, NGỘ ĐỘC THUỐC PHẢI NGƯNG VÀ ĐI KHÁM NGAY)"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 47,
+    "id": "kbq_doc003_chunk0015_3",
+    "doctor_red_notes": {
+      "answer": "Trong thời gian này, không nên tự ý ngưng thuốc hoặc thay đổi liều mà chưa có chỉ định của bác sĩ.== NGHI DỊ ỨNG HAY QUÁ MẪN NÊN NGƯNG THUỐC NGAY"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 55,
+    "id": "kbq_doc003_chunk0023_2",
+    "doctor_red_notes": {
+      "answer": "Không nên tự ý ngưng  TRIỆU CHỨNG.NGHI QUÁ MẪN VỚI ALLOPURINOL CẦN NGƯNG THUỐC VÀ ĐI KHÁM NGAY h"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 56,
+    "id": "kbq_doc003_chunk0024_3",
+    "doctor_red_notes": {
+      "answer": "Không nên tự ý ngưng XUẤT HIỆN TRIỆU CHỨNG NGUY HIỂM TIM MẠCH KHI DÙNG THUỐC FEBU PHẢI NGƯNG THUỐC VÀ ĐẾN CƠ SỞ Y TẾ CÓ CẤP CỨU GẦN NHẤT"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 57,
+    "id": "kbq_doc003_chunk0025_2",
+    "doctor_red_notes": {
+      "answer": "ĐAU THẮT NGỰC VÀ KHÓ THỞ LÀ MỘT CẤP CỨU Y KHOA CÓ THỂ GÂY TỬ VONG CẦN ĐƯỢC ĐƯA ĐẾN CƠ SỞ Y TẾ GẦN NHẤT"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 61,
+    "id": "kbq_doc003_chunk0029_1",
+    "doctor_red_notes": {
+      "answer": "NGƯNG THUỐC NGAY NẾU CÓ DẤU HIỆU DỊ ỨNG THUỐC,"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 66,
+    "id": "kbq_doc003_chunk0040_3",
+    "doctor_red_notes": {
+      "answer": "NỔI MẪN HAY DỊ ỨNG VỚI THUỐC PHẢI NGƯNG THUỐC VÀ ĐI KHÁM NGAY"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 71,
+    "id": "sinh_nguoc_0109",
+    "doctor_red_notes": {
+      "answer": "CHO NGƯỜI NHÀ NGƯNG THUỐC VÀ ĐI KHÁM Ở CƠ SỞ Y TẾ GẦN NHẤT"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 74,
+    "id": "dlg_017",
+    "doctor_red_notes": {
+      "history": "giữ ấm vùng khớp bị đau. CHƯỜM LẠNH CHỨ TUYỆT ĐỐI KHÔNG NÊN CHƯỜM NÓNG"
+    },
+    "action": "AI normalization of history from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 82,
+    "id": "dlg_057",
+    "doctor_red_notes": {
+      "history": "Cháu năm nay 65 tuổi??? 65 TUỔI?"
+    },
+    "action": "AI normalization of history from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 89,
+    "id": "kbq_doc003_chunk0031_0",
+    "doctor_red_notes": {
+      "answer": "đau bụng kèm tiêu chảy nặng hoặc các triệu chứng khác nghiêm trọng,==> NGƯNG  thuốc ngay vì đó là triệu chứng của ngộ độc COLCHICIN"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 98,
+    "id": "kbq_doc001_chunk0019_0",
+    "doctor_red_notes": {
+      "answer": "VIỆC DÙNG COLCHICIN SAU 48 GIỜ NHƯNG KHÔNG ĐỠ ĐAU KHÔNG NÊN TỰ Ý ĐỔI SANG CORTICOID MÀ NÊN THAM KHÁM LẠI BÁC SĨ"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  },
+  {
+    "stt": 136,
+    "id": "kbq_doc001_chunk0005_0",
+    "doctor_red_notes": {
+      "answer": "HEO HÀM LƯỢNG THAM VẤN VỚI BÁC SĨ CỦA BẠN)"
+    },
+    "action": "AI rewrite of answer from doctor feedback",
+    "physician_approved": false
+  }
+]

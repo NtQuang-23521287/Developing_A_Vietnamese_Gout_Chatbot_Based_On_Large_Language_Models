@@ -7,8 +7,8 @@ from gout_llmops.core.config import load_yaml
 from gout_llmops.training.sft import train_sft
 
 CONFIGS = {
-    "qwen3": "configs/training/sft_qwen3_8b.yaml",
-    "gemma3": "configs/training/sft_gemma3_4b.yaml",
+    "qwen3": "configs/training/sft_qwen3_8b_v3.yaml",
+    "gemma3": "configs/training/sft_gemma3_4b_v3.yaml",
 }
 
 
