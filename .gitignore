@@ -45,7 +45,7 @@ checkpoints/
 .dvc/cache/
 
 # SFT model weights
-*.safetensors
+# *.safetensors
 *.pt
 *.pth
 *_FULL.zip
