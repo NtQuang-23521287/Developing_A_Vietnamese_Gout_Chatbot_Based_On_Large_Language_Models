@@ -25,11 +25,14 @@ from gout_llmops.safety.guard import (
 )
 from gout_llmops.safety.policy import (
     ABSTAIN,
+    DRUG_EXCEPTION_NOTE,
+    DRUG_STOP_NOTE,
     HEDGE,
     OUT_OF_SCOPE_ANSWER,
     SELF_MED_NOTE,
     PolicyConfig,
     apply_policy,
+    stop_advice,
 )
 from gout_llmops.safety.uncertainty import (
     reconstruct_messages,
@@ -136,6 +139,77 @@ def test_self_med_note_skipped_when_answer_explicitly_warns():
     g = run_guard("Tôi tự tăng liều colchicine được không?")
     assert apply_policy("Ok.", g).final_answer.startswith(SELF_MED_NOTE)
     assert not apply_policy("Bạn không nên tự ý tăng liều colchicine.", g).changed
+
+
+# --- Quy tắc phản ứng thuốc (góp ý bác sĩ, duyệt SFT v2 vòng 1): ngưng thuốc nghi gây phản ứng + đi khám ngay ---
+@pytest.mark.parametrize("text,expected", [
+    ("Tuyệt đối không tự ý ngưng thuốc.", (False, True)),
+    ("Bạn không nên tự ý ngưng thuốc.", (False, True)),
+    ("Việc tự ý ngưng thuốc có thể làm cơn gút kéo dài.", (False, True)),
+    ("Bạn không nên ngưng allopurinol.", (False, True)),
+    ("Nếu triệu chứng không giảm hãy ngưng thuốc.", (True, False)),
+    ("Bạn cần ngừng colchicine.", (True, False)),
+    ("Ngừng colchicine và đến cơ sở y tế ngay.", (True, False)),
+    ("Trong trường hợp này ngưng thuốc ngay và đi khám.", (True, False)),
+    ("Bạn nên ngưng thuốc và đi khám. Không nên tự ý tiếp tục dùng thuốc.", (True, False)),
+    ("Nếu bạn ngưng thuốc đột ngột, acid uric có thể tăng.", (False, False)),
+    ("Hãy hỏi bác sĩ trước khi ngưng.", (False, False)),
+])
+def test_stop_advice(text, expected):
+    assert stop_advice(text) == expected
+
+
+@pytest.mark.parametrize("q", [
+    "Tôi đang dùng colchicin để điều trị gút, nếu thấy đau bụng tiêu chảy thì có nên tự ngưng thuốc không?",
+    "Tôi đang dùng allopurinol mà bị nổi ban đỏ và sốt, có phải phản ứng nghiêm trọng không?",
+    "Tôi bị đau ngực và khó thở khi đang dùng febuxostat, có nguy hiểm không?",
+])
+def test_drug_reaction_detected(q):
+    assert run_guard(q).drug_reaction
+
+
+def test_no_drug_reaction_without_medication_or_reaction_sign():
+    assert not run_guard("Tôi bị đau ngực và khó thở, có sao không?").drug_reaction
+    assert not run_guard("Tôi muốn tự ngưng allopurinol khi hết đau được không?").drug_reaction
+
+
+def test_drug_reaction_dont_stop_answer_is_replaced():
+    """Đúng lỗi bác sĩ đã sửa: colchicine gây tiêu chảy mà khuyên 'không tự ý ngưng thuốc'."""
+    g = run_guard("Tôi đang dùng colchicin, nếu thấy đau bụng tiêu chảy thì có nên tự ngưng thuốc không?")
+    d = apply_policy("Bạn không nên tự ý ngưng thuốc vì sẽ ảnh hưởng hiệu quả điều trị.", g)
+    assert d.actions == ["drug_reaction_override"]
+    assert "không nên tự ý ngưng" not in d.final_answer
+    assert d.final_answer.startswith("**Cần đi khám ngay:**") and d.final_answer.endswith(DRUG_STOP_NOTE)
+
+
+def test_drug_reaction_adds_stop_note_and_never_self_med_note():
+    g = run_guard("Tôi đang dùng allopurinol mà bị nổi ban đỏ và sốt, tôi có nên tự ngưng thuốc không?")
+    assert g.has(SELF_MEDICATION) and g.drug_reaction
+    d = apply_policy("Bạn nên liên hệ bác sĩ để được tư vấn.", g)
+    assert d.actions == ["red_flag_banner", "drug_stop_note"]
+    assert SELF_MED_NOTE not in d.final_answer
+    ok = apply_policy("Bạn cần ngừng allopurinol và đến khoa cấp cứu ngay.", g)
+    assert not ok.changed
+
+
+def test_dont_stop_answer_gets_doctor_exception():
+    g = run_guard("Đang dùng allopurinol mà sốt cao, khớp sưng nóng thì có phải ngưng thuốc và đi khám ngay không?")
+    assert not g.drug_reaction
+    d = apply_policy("Bạn nên đi khám ngay. Không tự ý ngưng thuốc allopurinol.", g)
+    assert d.actions == ["drug_exception_note"] and d.final_answer.startswith(DRUG_EXCEPTION_NOTE)
+
+
+def test_self_med_note_carries_doctor_exception_and_switch_rule():
+    assert "cần ngưng thuốc nghi gây phản ứng và đi khám ngay" in SELF_MED_NOTE
+    g = run_guard("Đang dùng colchicine nhưng không đỡ, có thể chuyển sang dùng corticoid được không?")
+    assert "switch_drug" in g.rules
+    assert apply_policy("Corticoid có thể dùng trong cơn gút cấp.", g).actions == ["self_medication_note"]
+
+
+def test_drug_reaction_rule_can_be_disabled_for_ablation():
+    g = run_guard("Tôi đang dùng colchicin, bị tiêu chảy nhiều, có nên tự ngưng thuốc không?")
+    d = apply_policy("Bạn không nên tự ý ngưng thuốc.", g, config=PolicyConfig(drug_reaction_rule=False))
+    assert "drug_reaction_override" not in d.actions and "red_flag_banner" in d.actions
 
 
 def test_abstain_and_hedge_on_high_uncertainty():

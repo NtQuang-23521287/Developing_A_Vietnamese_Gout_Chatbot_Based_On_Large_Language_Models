@@ -10,6 +10,7 @@ guard:
 policy:                            # src/gout_llmops/safety/policy.py (mẫu câu cần bác sĩ duyệt)
   red_flag_banner: true
   self_medication_note: true
+  drug_reaction_rule: true         # góp ý bác sĩ (duyệt SFT v2 vòng 1): phản ứng thuốc -> ngưng thuốc + đi khám ngay
   out_of_scope_refusal: true
   uncertainty_action: abstain      # abstain = thay bằng mẫu từ chối an toàn | hedge = giữ câu trả lời + cảnh báo
   max_sources: 3

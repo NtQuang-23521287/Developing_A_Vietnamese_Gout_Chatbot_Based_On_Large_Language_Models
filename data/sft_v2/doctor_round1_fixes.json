@@ -1,0 +1,85 @@
+{
+  "version": "doctor_round1_fixes_v1",
+  "applies_to": "data/sft_v2/train.jsonl + val.jsonl (151 mẫu đã gửi bác sĩ, bản tích hợp ghi chú vòng 1 ngày 16/11/2026)",
+  "status": "Nhóm sửa theo ghi chú bác sĩ vòng 1. Nhóm dùng kết quả vòng 1, không duyệt lại (quyết định 19/11/2026); các chỉnh sửa này không được bác sĩ xem lại.",
+  "doctor_rules": {
+    "R1": "Có dấu hiệu dị ứng, quá mẫn, ngộ độc thuốc hoặc tác dụng phụ nặng (vd. đau bụng, tiêu chảy nhiều khi dùng colchicine) thì PHẢI ngưng thuốc và đi khám ngay; không khuyên 'không tự ý ngưng thuốc'. Bác sĩ ghi ở 11 dòng, vd. kbq_doc001_chunk0018_1, kbq_doc003_chunk0000_0, kbq_doc003_chunk0014_2.",
+    "R2": "Ghi chú của người duyệt không được nằm trong hội thoại dùng để train."
+  },
+  "fixes": [
+    {
+      "id": "kbq_doc000_chunk0015_1",
+      "action": "replace_answer",
+      "basis": "R1 áp sang dòng cùng tình huống (bác sĩ không đánh dấu dòng này)",
+      "doctor_note_ref": "kbq_doc003_chunk0000_0: «ĐÃ TIÊU CHẢY NẶNG NÊN NGƯNG THUỐC NGAY VÀ ĐI KHÁM BS CHUYÊN KHOA HOẶC CẤP CỨU VÌ NGUY CƠ MẤT NƯỚC NẶNG»",
+      "reason": "Câu trả lời cũ khuyên 'tránh tự ý ngưng thuốc' khi colchicin gây tiêu chảy nặng.",
+      "new": "Có. Tiêu chảy nặng khi đang dùng colchicin là dấu hiệu cảnh báo nguy hiểm: có thể do ngộ độc hoặc quá liều thuốc, và dễ gây mất nước nặng. Bạn nên ngưng colchicin và đến cơ sở y tế gần nhất để được khám ngay, không tiếp tục uống rồi chỉ tự theo dõi ở nhà. Nếu kèm nôn nhiều, đau bụng dữ dội, mệt lả, chóng mặt, tiểu ít hoặc yếu cơ, hãy đi cấp cứu. Không tự mua thuốc cầm tiêu chảy hay tự chuyển sang thuốc điều trị gút khác khi chưa được bác sĩ khám. Khi đi khám, hãy mang theo đơn thuốc và cho bác sĩ biết liều đang uống, thời điểm bắt đầu tiêu chảy và các bệnh kèm theo như bệnh thận, để bác sĩ quyết định cách xử trí và thuốc điều trị gút phù hợp sau đó."
+    },
+    {
+      "id": "kbq_doc000_chunk0018_2",
+      "action": "replace_answer",
+      "basis": "R1 áp sang dòng cùng tình huống (bác sĩ không đánh dấu dòng này)",
+      "doctor_note_ref": "kbq_doc001_chunk0018_1: «DẤU HIỆU ĐAU BỤNG VÀ TIÊU CHẢY NHIỀU LÀ DẤU HIỆU CẢNH BÁO NGUY HIỂM NGỘ ĐỘC HAY QUÁ LIỀU THUỐC CẦN NGƯNG THUỐC VÀ ĐI KHÁM Ở CƠ SỞ Y TẾ GẦN NHẤT»",
+      "reason": "Câu trả lời cũ khuyên 'không nên tự ý ngưng thuốc' khi colchicin gây đau bụng, tiêu chảy.",
+      "new": "Đau bụng, tiêu chảy khi đang dùng colchicin là tác dụng phụ thường gặp của thuốc, và nếu tiêu chảy nhiều thì đây là dấu hiệu cảnh báo ngộ độc hoặc quá liều thuốc. Trong trường hợp này, bạn nên ngưng colchicin và đi khám ở cơ sở y tế gần nhất sớm nhất có thể, không tự xử trí tại nhà. Nếu tiêu chảy nhiều lần, nôn, đau bụng dữ dội, mệt lả, tiểu ít hoặc có dấu hiệu mất nước, hãy đi cấp cứu ngay. Không tự uống thêm thuốc cầm tiêu chảy hay tự chuyển sang thuốc điều trị gút khác khi chưa hỏi bác sĩ. Bác sĩ sẽ đánh giá nguyên nhân và quyết định có dùng lại colchicin với liều khác hay đổi sang thuốc khác để kiểm soát cơn gút; hãy mang theo đơn thuốc khi đi khám."
+    },
+    {
+      "id": "kbq_doc003_chunk0043_2",
+      "action": "edit_answer",
+      "turn": -1,
+      "basis": "R1: thêm đúng ngoại lệ bác sĩ đã ghi ở dòng cùng tình huống (sốt khi đang dùng thuốc hạ acid uric)",
+      "doctor_note_ref": "kbq_doc003_chunk0014_2: «không nên tự ý ngưng thuốc ( NẾU TÁC DỤNG PHỤ NẶNG VÀ BIỂU HIỆN CỦA DỊ ỨNG, NGỘ ĐỘC THUỐC PHẢI NGƯNG VÀ ĐI KHÁM NGAY)»",
+      "reason": "Câu trả lời khuyên không tự ý ngưng thuốc nhưng thiếu ngoại lệ phản ứng thuốc.",
+      "old": "Không nên tự ý ngưng thuốc hoặc thay đổi liều khi chưa có chỉ định của bác sĩ vì có thể làm tình trạng bệnh nặng hơn hoặc gây tác dụng phụ.",
+      "new": "Không nên tự ý ngưng thuốc hoặc thay đổi liều khi chưa có chỉ định của bác sĩ vì có thể làm tình trạng bệnh nặng hơn hoặc gây tác dụng phụ. Riêng khi có tác dụng phụ nặng hoặc biểu hiện dị ứng, ngộ độc thuốc (như nổi ban, phồng rộp da, khó thở) thì phải ngưng thuốc và đi khám ngay."
+    },
+    {
+      "id": "kbq_doc003_chunk0013_2",
+      "action": "edit_answer",
+      "turn": -1,
+      "basis": "R1: thêm đúng ngoại lệ bác sĩ đã ghi ở dòng cùng tình huống (sốt khi đang dùng allopurinol)",
+      "doctor_note_ref": "kbq_doc003_chunk0023_2: «NGHI QUÁ MẪN VỚI ALLOPURINOL CẦN NGƯNG THUỐC VÀ ĐI KHÁM NGAY»; kbq_doc003_chunk0014_2",
+      "reason": "Câu trả lời khuyên không tự ý ngưng allopurinol nhưng thiếu ngoại lệ dị ứng/quá mẫn.",
+      "old": "Không tự ý ngưng thuốc allopurinol mà không có chỉ định của bác sĩ, vì việc thay đổi thuốc đột ngột có thể làm tình trạng bệnh trở nên nặng hơn hoặc gây tác dụng phụ.",
+      "new": "Không tự ý ngưng thuốc allopurinol mà không có chỉ định của bác sĩ, vì việc thay đổi thuốc đột ngột có thể làm tình trạng bệnh trở nên nặng hơn hoặc gây tác dụng phụ. Riêng khi có biểu hiện dị ứng hoặc quá mẫn với allopurinol (như nổi ban, phồng rộp da, loét miệng, khó thở) thì phải ngưng thuốc và đi khám ngay."
+    },
+    {
+      "id": "kbq_doc003_chunk0008_2",
+      "action": "edit_answer",
+      "turn": -1,
+      "basis": "R1: thêm ngoại lệ bác sĩ đã ghi cho câu khuyên không tự ý ngưng thuốc trong nhóm dấu hiệu nguy hiểm",
+      "doctor_note_ref": "kbq_doc003_chunk0014_2; kbq_doc001_chunk0007_1: «Tuyệt đối không tự ý ngưng CÓ DẤU HIỆU DỊ ỨNG HOẶC NGỘ ĐỘC THUỐC PHẢI NGƯNG THUỐC VÀ ĐI KHÁM CƠ SỞ Y TẾ GẦN NHẤT»",
+      "reason": "Câu trả lời khuyên không tự ý ngưng thuốc hạ acid uric nhưng thiếu ngoại lệ phản ứng thuốc.",
+      "old": "Tuy nhiên, không nên tự ý ngưng thuốc vì điều này có thể làm tình trạng gút nặng hơn hoặc tái phát nhiều đợt cấp.",
+      "new": "Tuy nhiên, không nên tự ý ngưng thuốc vì điều này có thể làm tình trạng gút nặng hơn hoặc tái phát nhiều đợt cấp. Riêng khi có tác dụng phụ nặng hoặc biểu hiện dị ứng, ngộ độc thuốc (như nổi ban, phồng rộp da, khó thở) thì phải ngưng thuốc và đi khám ngay."
+    },
+    {
+      "id": "seed_qa_0006",
+      "action": "edit_question",
+      "turn": -1,
+      "basis": "Ghi chú bác sĩ ở chính dòng này (cột Câu hỏi) — bản tích hợp ngày 16/11 bỏ sót",
+      "doctor_note": "«Alluphenul (SAI TÊN THUỐC ALLOPURINOL)»",
+      "reason": "Ghi chú của bác sĩ bị chép vào câu hỏi của người dùng.",
+      "old": "Allopurinol (SAI TÊN THUỐC ALLOPURINOL)",
+      "new": "Allopurinol"
+    },
+    {
+      "id": "seed_qa_0016",
+      "action": "drop",
+      "basis": "Ghi chú bác sĩ ở chính dòng này (cột Câu hỏi) — bản tích hợp ngày 16/11 bỏ sót",
+      "doctor_note": "«Câu hỏi không rõ ràng ( bệnh nhân bệnh lao kê? Đang uống thuốc điều trị ?điều trị gì? lao? gout???) BỆNH LAO KÊ VÀ GOUT LÀ 2 BỆNH HOÀN TOÀN KHÁC NHAU»",
+      "reason": "Bác sĩ đánh giá câu hỏi không rõ ràng; câu trả lời đánh đồng lao kê với bệnh gút; ghi chú bác sĩ lọt vào câu hỏi."
+    },
+    {
+      "id": "dlg_017",
+      "action": "edit_answer",
+      "turn": 1,
+      "basis": "R2: giữ nội dung bác sĩ sửa (chườm lạnh, tránh chườm nóng), bỏ đường link khỏi lời chatbot",
+      "doctor_note": "«CHƯỜM LẠNH CHỨ TUYỆT ĐỐI KHÔNG NÊN CHƯỜM NÓNG (https://benhviennoitiet.vn/xu-tri-con-gut-cap-tai-nha-nhung-dieu-nguoi-benh-can-biet/)»",
+      "doctor_source": "https://benhviennoitiet.vn/xu-tri-con-gut-cap-tai-nha-nhung-dieu-nguoi-benh-can-biet/",
+      "reason": "Đường link nguồn bác sĩ dẫn nằm trong lời chatbot ở lượt trước; nguồn được lưu ở đây thay vì trong hội thoại.",
+      "old": " (https://benhviennoitiet.vn/xu-tri-con-gut-cap-tai-nha-nhung-dieu-nguoi-benh-can-biet/)",
+      "new": "."
+    }
+  ]
+}

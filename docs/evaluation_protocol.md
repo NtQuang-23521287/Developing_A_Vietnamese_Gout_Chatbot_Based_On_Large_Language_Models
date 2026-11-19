@@ -45,3 +45,10 @@ Hệ quả và cách xử lý:
   (notebook 04, bước 0, `qwen3_8b_base_rerank`). So run đó với run Giai đoạn 2 cho ablation có/không reranker.
 - `FaissRetriever` giờ báo lỗi khi config bật reranker mà không nạp được. `eval_adapter.py gate` từ chối so hai run
   khác protocol truy xuất; `compare_runs_v2.py` in cảnh báo (`src/gout_llmops/evaluation/protocol_check.py`).
+
+## Chốt chặn tập test (từ 19/11/2026)
+
+- `eval_adapter.py generate/score/gate` và `score_run_v2.py` từ chối split `test` hoặc `all` (gồm test) nếu không có
+  `--final-test`: mọi lựa chọn model, checkpoint, ngưỡng đều dựa trên dev; test chạy một lần cho cấu hình đã chốt.
+- `scripts/evaluate_post_sft.py` (viết cho SFT v1: kiểm tra cứng lr/10 epoch, chạy cả 381 case) cần `--legacy-sft-v1`.
+  Từ SFT v3 dùng `eval_adapter.py` trên dev. Chi tiết dữ liệu SFT v2/v2.1: `docs/sft_v2_doctor_review.md`.

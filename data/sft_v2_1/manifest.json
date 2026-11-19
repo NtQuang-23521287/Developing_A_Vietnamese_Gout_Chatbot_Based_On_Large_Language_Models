@@ -1,0 +1,58 @@
+{
+  "version": "sft_v2_1",
+  "generated_at": "2026-11-19",
+  "n_train": 136,
+  "n_val": 14,
+  "n_doctor_sample": 150,
+  "n_extra_unreviewed": 0,
+  "by_category": {
+    "train": {
+      "basic_knowledge": 18,
+      "clinical_reasoning": 18,
+      "out_of_scope": 18,
+      "red_flag": 64,
+      "safety_trap": 18
+    },
+    "val": {
+      "basic_knowledge": 2,
+      "clinical_reasoning": 2,
+      "out_of_scope": 2,
+      "red_flag": 6,
+      "safety_trap": 2
+    }
+  },
+  "multi_turn": 16,
+  "fixes": {
+    "replace_answer": 2,
+    "edit_answer": 4,
+    "edit_question": 1,
+    "drop": 1
+  },
+  "fixed_ids": [
+    "kbq_doc000_chunk0015_1",
+    "kbq_doc000_chunk0018_2",
+    "kbq_doc003_chunk0043_2",
+    "kbq_doc003_chunk0013_2",
+    "kbq_doc003_chunk0008_2",
+    "seed_qa_0006",
+    "seed_qa_0016",
+    "dlg_017"
+  ],
+  "source_labels_restored": 151,
+  "lint_ruleset": "doctor_round1_rules_v1",
+  "extra_unreviewed_dropped_by_rule": {},
+  "physician_review": "Bác sĩ xem 151 mẫu (vòng 1, gửi 07/11) và ghi chú trực tiếp vào 19 dòng, không điền cột ĐÁNH GIÁ. Nhóm dùng kết quả này, không duyệt lại (quyết định 19/11/2026): dòng không có ghi chú được giữ nguyên; dòng có ghi chú được nhóm sửa theo ghi chú.",
+  "corrections_rechecked_by_physician": false,
+  "provenance": "151 mẫu gửi bác sĩ -> bác sĩ ghi chú 19 dòng -> nhóm tích hợp ghi chú (16/11, data/sft_v2, doctor_feedback_audit.json) -> sửa thêm theo doctor_round1_fixes.json + kiểm tra luật bác sĩ (19/11, data/sft_v2_1).",
+  "rag_context": "chunk KB đầy đủ của lượt cuối, nhãn nguồn thật — giống hệt lúc suy luận (bản 16/11 cũng là chunk đầy đủ, chỉ đổi nhãn nguồn thành doctor_review_excerpt_i)",
+  "val_note": "val = các mẫu val của bản 16/11 (trừ mẫu bị bỏ) để so được với SFT v3",
+  "format": "build_messages(system_vi_v1 + NGỮ CẢNH RAG lượt cuối, history<=2 cặp) + assistant",
+  "inputs": {
+    "data/sft_v2/train.jsonl": "5a9249207391c707ffacbec8394807b124530945eb0310c9d0d88f8d76a28310",
+    "data/sft_v2/val.jsonl": "36799dd09a73c5dd08cef6d850e677c581200db9239da83c6fd011b9bdde168a",
+    "data/sft_v2/doctor_round1_fixes.json": "d1e4dc2a40053089b2d8c233b4b262232e67b12abfc748d7b2be2e6aac9feb1d",
+    "artifacts/kb/gout_kb_v1/chunks.jsonl": "d0a430a05729befa85b328f8efa3c699ab8f55605699bd0d6a5de7edcd99c55a"
+  },
+  "sha256_train.jsonl": "f506f06c31b45a3988d4e24196c485ed2be9d730700fff5c191e9c33c8a4f57a",
+  "sha256_val.jsonl": "d629b2744896385eb31c25a9291e02df97b173196809f01d95e05b5452927ef5"
+}

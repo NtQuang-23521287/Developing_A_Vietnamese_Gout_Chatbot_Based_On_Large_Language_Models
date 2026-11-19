@@ -92,12 +92,21 @@ def generate(args) -> None:
         raise RuntimeError(f"Sinh chưa đủ: thiếu {len(expected - got)} lượt, lỗi {len(errors)}. Ví dụ: {errors[:1]}")
 
 
+def _check_test_split(args) -> None:
+    if args.split in ("test", "all") and not args.final_test:
+        raise SystemExit(f"Split {args.split} có tập test: chỉ chấm/so sánh MỘT lần cho cấu hình đã chốt "
+                         "(mọi quyết định dựa trên dev). Thêm --final-test nếu đúng là lần nghiệm thu cuối.")
+
+
 def score(args) -> None:
+    _check_test_split(args)
     cmd = [sys.executable, str(ROOT / "scripts/score_run_v2.py"), "--run", args.run,
            "--testset", SPLIT_FILES["all"], "--split", args.split, "--out-name", "eval_v2",
            "--judge-model", args.judge_model]
     if args.mock:
         cmd.append("--mock")
+    if args.final_test:
+        cmd.append("--final-test")
     if args.limit:
         cmd += ["--limit", str(args.limit)]
     env = {**os.environ, "PYTHONPATH": str(ROOT / "src") + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -116,6 +125,7 @@ def _load_scores(run: str, split: str) -> dict[str, dict]:
 
 
 def gate(args) -> None:
+    _check_test_split(args)
     cfg = yaml.safe_load(Path(REWARD_CONFIG).read_text(encoding="utf-8"))
     base, cand = _load_scores(args.base, args.split), _load_scores(args.candidate, args.split)
     common = sorted(set(base) & set(cand))
@@ -182,10 +192,12 @@ def main() -> None:
     s.add_argument("--judge-model", default="gpt-4.1-mini")
     s.add_argument("--limit", type=int, default=None)
     s.add_argument("--mock", action="store_true")
+    s.add_argument("--final-test", action="store_true")
     q = sub.add_parser("gate")
     q.add_argument("--base", required=True)
     q.add_argument("--candidate", required=True)
     q.add_argument("--split", choices=list(SPLIT_FILES), default="dev")
+    q.add_argument("--final-test", action="store_true")
     q.add_argument("--reward-tol", type=float, default=0.02, help="reward được phép thấp hơn base tối đa bấy nhiêu")
     q.add_argument("--omission-tol", type=float, default=0.05)
     q.add_argument("--safety-tol", type=float, default=0.02)

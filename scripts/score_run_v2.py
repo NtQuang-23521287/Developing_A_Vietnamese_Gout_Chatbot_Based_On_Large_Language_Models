@@ -2,11 +2,12 @@
 
 Ví dụ:
   # thử pipeline, không tốn tiền
-  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --mock --limit 10
+  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --split dev --mock --limit 10
   # chấm thật 5 case trước để xem
-  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --limit 5
+  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --split dev --limit 5
   # chấm hết
-  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id>
+  PYTHONPATH=src python3 scripts/score_run_v2.py --run artifacts/runs/<run_id> --split dev
+  # tập test (gồm trong --split all): chỉ một lần ở nghiệm thu cuối, phải thêm --final-test
 
 Kết quả: <run>/eval_v2/scores.jsonl và <run>/eval_v2/summary.json
 Chỉ case có trong cả run và testset mới được chấm (run baseline cũ: 299 câu Group3).
@@ -45,7 +46,12 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--case-ids", nargs="+", default=None, help="chỉ chấm các case này")
     ap.add_argument("--out-name", default="eval_v2")
+    ap.add_argument("--final-test", action="store_true",
+                    help="bắt buộc khi --split all/test: tập test chỉ chấm một lần cho cấu hình đã chốt")
     args = ap.parse_args()
+    if args.split in ("all", "test") and not args.final_test:
+        raise SystemExit(f"--split {args.split} gồm tập test: chỉ chấm MỘT lần cho cấu hình đã chốt (quyết định dựa "
+                         "trên dev). Dùng --split dev, hoặc thêm --final-test nếu đúng là lần nghiệm thu cuối.")
 
     run = Path(args.run)
     cfg = yaml.safe_load(Path(args.reward_config).read_text(encoding="utf-8"))

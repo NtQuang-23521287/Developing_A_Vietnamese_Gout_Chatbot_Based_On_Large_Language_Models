@@ -5,9 +5,15 @@ Lớp an toàn đứng SAU model, không đổi model hay prompt -> đo riêng �
   2. độ bất định > ngưỡng τ        -> "abstain": thay bằng mẫu từ chối an toàn + tài liệu liên quan;
                                      hoặc "hedge": giữ câu trả lời, thêm cảnh báo độ chắc chắn thấp.
   3. red_flag                     -> chèn banner khám/cấp cứu lên đầu, trừ khi câu trả lời đã khuyên rõ.
-  4. self_medication              -> chèn lưu ý không tự ý dùng/đổi thuốc, trừ khi câu trả lời đã nói rõ.
+  4. drug_reaction (đang có phản ứng thuốc) -> theo bác sĩ: ngưng thuốc nghi gây phản ứng + đi khám ngay.
+                                     Câu trả lời khuyên "không tự ý ngưng" mà không hề khuyên ngưng -> thay bằng
+                                     banner + hướng dẫn ngưng thuốc; thiếu lời khuyên ngưng -> chèn hướng dẫn đó.
+                                     Không chèn lưu ý "không tự ý ngừng thuốc" (mâu thuẫn với bác sĩ).
+  5. self_medication              -> chèn lưu ý không tự ý dùng/đổi thuốc (kèm ngoại lệ phản ứng thuốc của bác sĩ),
+                                     trừ khi câu trả lời đã nói rõ.
 
-Mọi mẫu câu ở đây là quy ước của nhóm, CẦN bác sĩ duyệt trước khi triển khai thật.
+Mọi mẫu câu ở đây là quy ước của nhóm, CẦN bác sĩ duyệt trước khi triển khai thật. Phần phản ứng thuốc lấy theo
+góp ý của bác sĩ ở đợt duyệt SFT v2 vòng 1 (11/2026).
 Module thuần (không GPU) để unit test và dùng chung cho chế độ offline (scripts/safe_inference.py apply)
 và online (chat/safe_engine.py) — hai chế độ cho ra cùng một câu trả lời.
 """
@@ -24,27 +30,29 @@ from gout_llmops.safety.guard import (
     RULE_BY_ID,
     SELF_MEDICATION,
     GuardResult,
+    lower_accented,
     normalize,
 )
 
-POLICY_VERSION = "safe_policy_v1"
+POLICY_VERSION = "safe_policy_v2"   # v2: quy tắc phản ứng thuốc theo góp ý bác sĩ
 
 RED_FLAG_REASONS: dict[str, str] = {
     "fever": "sốt (nhất là khi kèm khớp sưng nóng đỏ) có thể là dấu hiệu nhiễm trùng khớp hoặc nhiễm trùng toàn thân",
-    "chest_pain_dyspnea": "đau ngực, khó thở hoặc ngất có thể là bệnh lý tim mạch, hô hấp cấp",
+    "chest_pain_dyspnea": "đau thắt ngực, khó thở hoặc ngất là cấp cứu y khoa, có thể nguy hiểm tính mạng",
     "gi_bleeding": "phân đen, nôn hoặc đi ngoài ra máu có thể là xuất huyết tiêu hóa",
     "renal_failure_signs": ("tiểu rất ít, tiểu ra máu hoặc đau quặn thắt lưng có thể là biến chứng ở thận, "
                             "đường tiết niệu"),
-    "colchicine_toxicity": ("nôn, tiêu chảy nhiều hoặc yếu cơ có thể là tác dụng phụ nặng của thuốc "
-                            "(ví dụ ngộ độc colchicine)"),
-    "severe_drug_reaction": "nổi ban, phồng rộp, bong da, loét miệng hoặc sưng môi, mặt có thể là dị ứng thuốc nặng",
+    "colchicine_toxicity": ("nôn, tiêu chảy nhiều hoặc yếu cơ có thể là ngộ độc hoặc quá liều thuốc (ví dụ "
+                            "colchicine), có nguy cơ mất nước nặng"),
+    "severe_drug_reaction": ("nổi ban, phồng rộp, bong da, loét miệng hoặc sưng môi, mặt có thể là dị ứng hoặc quá mẫn "
+                             "thuốc nặng"),
     "neuro_emergency": "lú lẫn, co giật, yếu liệt hoặc méo miệng là dấu hiệu thần kinh cấp",
     "severe_abdominal_pain": "đau bụng nhiều có thể là tác dụng phụ nặng của thuốc hoặc bệnh tiêu hóa cần được khám",
     "child_joint": ("trẻ em bị sưng đau khớp hiếm khi do gút, cần được bác sĩ khám để tìm nguyên nhân khác "
                     "như nhiễm trùng hay chấn thương"),
     "tophus_infection": "hạt tophi hoặc khớp bị vỡ, loét, chảy dịch hay có mủ có nguy cơ nhiễm trùng",
-    "colchicine_gi_effect": ("tiêu chảy, đau bụng hoặc nôn khi dùng colchicine cần báo bác sĩ để giảm liều "
-                             "hoặc ngừng thuốc kịp thời"),
+    "colchicine_gi_effect": ("đau bụng, tiêu chảy hoặc nôn khi đang dùng colchicine có thể là dấu hiệu ngộ độc "
+                             "hoặc quá liều thuốc"),
     "home_management_question": "các triệu chứng bạn mô tả không nên chỉ tự theo dõi tại nhà",
 }
 
@@ -54,7 +62,18 @@ URGENT_PROMPT = ("**Nên đi khám sớm:** {reasons}. Bạn nên được bác 
                  "không tự điều trị tại nhà.")
 SELF_MED_NOTE = ("**Lưu ý an toàn:** không tự ý bắt đầu, tăng, giảm hay ngừng thuốc, và không dùng thuốc được kê "
                  "cho người khác. Chọn thuốc và liều phải do bác sĩ điều trị quyết định, dựa trên bệnh kèm theo "
-                 "(thận, dạ dày, tim mạch, thai kỳ...) và các thuốc bạn đang dùng.")
+                 "(thận, dạ dày, tim mạch, thai kỳ...) và các thuốc bạn đang dùng. Riêng khi có dấu hiệu dị ứng, "
+                 "ngộ độc hoặc tác dụng phụ nặng (nổi ban, phồng rộp da, khó thở, đau ngực, tiêu chảy hay nôn nhiều) "
+                 "thì cần ngưng thuốc nghi gây phản ứng và đi khám ngay.")
+# Đang có phản ứng thuốc (guard.drug_reaction) — theo góp ý bác sĩ: ngưng thuốc nghi gây phản ứng và đi khám ngay.
+DRUG_STOP_NOTE = ("**Về thuốc đang dùng:** khi có dấu hiệu dị ứng, ngộ độc hoặc tác dụng phụ nặng như trên, cần "
+                  "ngưng thuốc nghi gây ra phản ứng (ví dụ colchicine, allopurinol, febuxostat) và đi khám ngay; mang "
+                  "theo đơn thuốc hoặc vỏ thuốc để bác sĩ xử trí. Không tự uống thêm thuốc khác để chữa triệu chứng; "
+                  "các thuốc điều trị bệnh khác thì hỏi bác sĩ trước khi ngưng.")
+# Câu trả lời khuyên "không tự ý ngưng thuốc" mà thiếu ngoại lệ — bác sĩ đã bổ sung đúng ngoại lệ này vào kiểu câu đó.
+DRUG_EXCEPTION_NOTE = ("**Lưu ý:** riêng khi có dấu hiệu dị ứng, ngộ độc hoặc tác dụng phụ nặng của thuốc (nổi ban, "
+                       "phồng rộp da, khó thở, đau ngực, tiêu chảy hay nôn nhiều) thì cần ngưng thuốc nghi gây phản "
+                       "ứng và đi khám ngay.")
 ABSTAIN = ("Mình chưa đủ chắc chắn để trả lời chính xác câu hỏi này dựa trên tài liệu hiện có, nên không muốn đưa "
            "ra thông tin có thể sai. Bạn nên hỏi trực tiếp bác sĩ chuyên khoa Cơ xương khớp hoặc bác sĩ đang điều "
            "trị cho bạn. Nếu có sốt, khớp sưng nóng đỏ dữ dội, đau ngực, khó thở hoặc tiểu rất ít, hãy đến cơ sở y tế "
@@ -74,13 +93,21 @@ _URGENT_CUE = (r"cap cuu|\b115\b|di kham ngay|kham ngay|den (ngay )?(benh vien|c
                r"ngay lap tuc|khan cap|nhap vien")
 # Câu trả lời đã nói rõ KHÔNG tự ý dùng/đổi thuốc -> không chèn lưu ý.
 _SELF_MED_CUE = (r"khong (nen |duoc )?tu (y )?(tang|giam|ngung|dung|mua|bo|doi|uong|dieu chinh|su dung|ke)|"
-                 r"khong (nen |duoc )?dung thuoc (cua|ke cho) nguoi khac")
+                 r"khong (nen |duoc )?dung thuoc (cua|ke cho) nguoi khac|"
+                 r"khong (nen |duoc )?(tu y |tu )?(chuyen|doi) (sang|qua|thuoc)")
+# Phân tích lời khuyên về NGỪNG thuốc (văn bản có dấu: "dừng" khác "dùng").
+_STOP_VERB = re.compile(r"\b(ngưng|ngừng|dừng)\b")
+_CLAUSE_END = re.compile(r"[.!?;:\n,()]")
+_NEGATION = ("không", "đừng", "tránh", "chớ")
+_ADVICE = ("nên", "cần", "phải", "hãy")
+_NOW_AFTER = re.compile(r"^(\s+[^\s.,;:!?]+){0,3}?\s+ngay\b")
 
 
 @dataclass
 class PolicyConfig:
     red_flag_banner: bool = True
     self_medication_note: bool = True
+    drug_reaction_rule: bool = True         # quy tắc phản ứng thuốc của bác sĩ (tắt chỉ để ablation)
     out_of_scope_refusal: bool = True
     uncertainty_action: str = "abstain"     # abstain | hedge
     threshold: float | None = None          # None = tắt nhánh độ bất định
@@ -120,6 +147,29 @@ def has_urgent_advice(answer: str) -> bool:
 
 def has_self_med_warning(answer: str) -> bool:
     return bool(re.search(_SELF_MED_CUE, normalize(answer)))
+
+
+def stop_advice(answer: str) -> tuple[bool, bool]:
+    """(có khuyên NGỪNG thuốc, có khuyên KHÔNG ngừng thuốc) — xét từng động từ ngưng/ngừng/dừng trong vế câu chứa nó.
+
+    "nên/cần/phải/hãy ngưng…", "ngưng ngay…", câu mở đầu bằng "Ngừng…" = khuyên ngừng; "không (nên) tự ý ngưng",
+    "tránh tự ý ngưng", "việc tự ý ngưng…" = khuyên không ngừng; "nếu bạn ngưng thuốc…" = trung tính.
+    """
+    text = lower_accented(answer)
+    stop = dont = False
+    for m in _STOP_VERB.finditer(text):
+        words = _CLAUSE_END.split(text[: m.start()])[-1].split()   # các từ trong vế câu, trước động từ
+        tail = words[-3:]
+        adv = next((i for i in range(len(tail) - 1, -1, -1) if tail[i] in _ADVICE), None)
+        if adv is not None:
+            negated = ((adv > 0 and tail[adv - 1] in _NEGATION)
+                       or (adv == 0 and len(words) > 3 and words[-4] in _NEGATION))
+            dont, stop = (True, stop) if negated else (dont, True)
+        elif any(w in _NEGATION for w in tail) or " ".join(tail).endswith(("tự ý", "tự")):
+            dont = True
+        elif not words or _NOW_AFTER.match(text[m.end(): m.end() + 40]):
+            stop = True
+    return stop, dont
 
 
 def urgent_banner(guard: GuardResult) -> str:
@@ -167,12 +217,28 @@ def apply_policy(answer: str, guard: GuardResult, *, uncertainty: float | None =
 
     prefix: list[str] = []
     abstained = "abstain_uncertain" in actions   # mẫu từ chối chỉ khuyên chung chung -> vẫn cần banner cụ thể
+    drug = cfg.drug_reaction_rule and guard.drug_reaction
+    says_stop, says_dont_stop = stop_advice(body)
+
+    if drug and says_dont_stop and not says_stop:
+        # Đang có phản ứng thuốc mà câu trả lời khuyên tiếp tục dùng: đúng lỗi bác sĩ đã sửa -> bỏ câu trả lời đó.
+        parts = ([urgent_banner(guard)] if cfg.red_flag_banner and guard.has(RED_FLAG) else []) + [DRUG_STOP_NOTE]
+        return SafetyDecision("\n\n".join(parts), [*actions, "drug_reaction_override"], guard.to_dict(),
+                              uncertainty, cfg.threshold)
+
     if cfg.red_flag_banner and guard.has(RED_FLAG) and (abstained or not has_urgent_advice(body)):
         prefix.append(urgent_banner(guard))
         actions.append("red_flag_banner")
-    if cfg.self_medication_note and guard.has(SELF_MEDICATION) and not has_self_med_warning(body):
-        prefix.append(SELF_MED_NOTE)
+    if drug:
+        if abstained or not says_stop:
+            prefix.append(DRUG_STOP_NOTE)
+            actions.append("drug_stop_note")
+    elif cfg.self_medication_note and guard.has(SELF_MEDICATION) and not has_self_med_warning(body):
+        prefix.append(SELF_MED_NOTE)           # đã kèm ngoại lệ phản ứng thuốc
         actions.append("self_medication_note")
+    elif cfg.drug_reaction_rule and says_dont_stop and not says_stop:
+        prefix.append(DRUG_EXCEPTION_NOTE)
+        actions.append("drug_exception_note")
 
     final = "\n\n".join([*prefix, body]) if prefix else body
     return SafetyDecision(final, actions, guard.to_dict(), uncertainty, cfg.threshold)
