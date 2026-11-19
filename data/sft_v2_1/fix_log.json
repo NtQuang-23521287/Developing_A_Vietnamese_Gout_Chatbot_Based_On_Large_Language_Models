@@ -1,0 +1,53 @@
+{
+  "fixes": [
+    {
+      "id": "kbq_doc000_chunk0015_1",
+      "action": "replace_answer",
+      "basis": "R1 áp sang dòng cùng tình huống (bác sĩ không đánh dấu dòng này)",
+      "reason": "Câu trả lời cũ khuyên 'tránh tự ý ngưng thuốc' khi colchicin gây tiêu chảy nặng."
+    },
+    {
+      "id": "kbq_doc000_chunk0018_2",
+      "action": "replace_answer",
+      "basis": "R1 áp sang dòng cùng tình huống (bác sĩ không đánh dấu dòng này)",
+      "reason": "Câu trả lời cũ khuyên 'không nên tự ý ngưng thuốc' khi colchicin gây đau bụng, tiêu chảy."
+    },
+    {
+      "id": "kbq_doc003_chunk0043_2",
+      "action": "edit_answer",
+      "basis": "R1: thêm đúng ngoại lệ bác sĩ đã ghi ở dòng cùng tình huống (sốt khi đang dùng thuốc hạ acid uric)",
+      "reason": "Câu trả lời khuyên không tự ý ngưng thuốc nhưng thiếu ngoại lệ phản ứng thuốc."
+    },
+    {
+      "id": "kbq_doc003_chunk0013_2",
+      "action": "edit_answer",
+      "basis": "R1: thêm đúng ngoại lệ bác sĩ đã ghi ở dòng cùng tình huống (sốt khi đang dùng allopurinol)",
+      "reason": "Câu trả lời khuyên không tự ý ngưng allopurinol nhưng thiếu ngoại lệ dị ứng/quá mẫn."
+    },
+    {
+      "id": "kbq_doc003_chunk0008_2",
+      "action": "edit_answer",
+      "basis": "R1: thêm ngoại lệ bác sĩ đã ghi cho câu khuyên không tự ý ngưng thuốc trong nhóm dấu hiệu nguy hiểm",
+      "reason": "Câu trả lời khuyên không tự ý ngưng thuốc hạ acid uric nhưng thiếu ngoại lệ phản ứng thuốc."
+    },
+    {
+      "id": "seed_qa_0006",
+      "action": "edit_question",
+      "basis": "Ghi chú bác sĩ ở chính dòng này (cột Câu hỏi) — bản tích hợp ngày 16/11 bỏ sót",
+      "reason": "Ghi chú của bác sĩ bị chép vào câu hỏi của người dùng."
+    },
+    {
+      "id": "seed_qa_0016",
+      "action": "drop",
+      "basis": "Ghi chú bác sĩ ở chính dòng này (cột Câu hỏi) — bản tích hợp ngày 16/11 bỏ sót",
+      "reason": "Bác sĩ đánh giá câu hỏi không rõ ràng; câu trả lời đánh đồng lao kê với bệnh gút; ghi chú bác sĩ lọt vào câu hỏi."
+    },
+    {
+      "id": "dlg_017",
+      "action": "edit_answer",
+      "basis": "R2: giữ nội dung bác sĩ sửa (chườm lạnh, tránh chườm nóng), bỏ đường link khỏi lời chatbot",
+      "reason": "Đường link nguồn bác sĩ dẫn nằm trong lời chatbot ở lượt trước; nguồn được lưu ở đây thay vì trong hội thoại."
+    }
+  ],
+  "ruleset": "doctor_round1_rules_v1"
+}

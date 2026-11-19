@@ -1,7 +1,11 @@
 # SFT v3 = huấn luyện trên DỮ LIỆU SFT v2 (RAG-aware, data/sft_v2). Thay cho sft_qwen3_8b_v2 (dữ liệu cũ).
 # Khác biệt so với lần trước:
 #  - dữ liệu có system prompt + NGỮ CẢNH RAG giống hệt lúc suy luận
-#  - ít epoch hơn (dữ liệu sạch, tránh học thuộc); chọn checkpoint theo REWARD TRÊN DEV, không chỉ val loss
+#  - lần train 17/11 (adapter trong repo) dùng 10 epoch; sft.py giữ checkpoint có val loss THẤP NHẤT
+#    (load_best_model_at_end, save_total_limit 2). Qwen: tốt nhất ở epoch 5; Gemma: ở epoch 10.
+#    Kế hoạch ban đầu là 3 epoch; 10 epoch + lr Gemma 2e-5 trùng với điều kiện cứng của
+#    scripts/evaluate_post_sft.py (viết cho SFT v1) — không đổi config cho vừa script đánh giá nữa.
+#  - chọn checkpoint cuối cùng theo REWARD TRÊN DEV (eval_adapter.py), không chỉ val loss
 #  - max_seq_length 3072 vì mỗi mẫu có context (~1.000 token) và multi-turn có lịch sử
 name: sft_gemma3_4b_v3
 model_family: gemma3

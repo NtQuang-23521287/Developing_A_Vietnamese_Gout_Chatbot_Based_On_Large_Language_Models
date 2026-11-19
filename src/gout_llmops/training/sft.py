@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 MODELS = {
-    "qwen3": {"id": "Qwen/Qwen3-8B", "file": "configs/models/qwen3_8b_v3.yaml", "end": "<|im_end|>"},
-    "gemma3": {"id": "google/gemma-3-4b-it", "file": "configs/models/gemma3_4b_v3.yaml", "end": "<end_of_turn>"},
+    "qwen3": {"id": "Qwen/Qwen3-8B", "file": "configs/models/qwen3_8b.yaml", "end": "<|im_end|>"},
+    "gemma3": {"id": "google/gemma-3-4b-it", "file": "configs/models/gemma3_4b.yaml", "end": "<end_of_turn>"},
 }
 
 
