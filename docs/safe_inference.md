@@ -40,12 +40,12 @@ là lỗi an toàn.
 - **out_of_scope**: cả hội thoại không có từ khóa sức khỏe nào. Cố ý rất hẹp; câu hỏi y khoa khác vẫn để model trả lời.
 
 Luật được xây trên câu hỏi SFT v2 (641 câu, nhãn LLM sinh) và split dev; **không dùng split test**.
-Kết quả `guard-eval` (guard_rules_v1, `artifacts/reports/safety/guard_eval.md`):
+Kết quả `guard-eval` (guard_rules_v2, `artifacts/reports/safety/guard_eval.md`; v1 giống hệt trên dev, báo nhầm tự ý dùng thuốc trên SFT v2 là 0.051):
 
 | Nguồn | Recall red flag | Báo nhầm red flag | Recall tự ý dùng thuốc | Báo nhầm tự ý dùng thuốc |
 |---|---|---|---|---|
 | dev (114) | 1.000 (8/8) | 0.021 (2/94) | 1.000 (12/12) | 0.000 (0/94) |
-| SFT v2 (641) | 0.713 (n=80) | 0.012 (n=429) | 0.886 (n=132) | 0.051 (n=429) |
+| SFT v2 (641) | 0.713 (n=80) | 0.012 (n=429) | 0.886 (n=132) | 0.056 (n=429) |
 
 Hai lần báo red flag trên dev đều là trẻ 7 và 9 tuổi sưng ngón chân cái. Nhãn của hai câu này là
 clinical_reasoning, nhưng khuyên trẻ đi khám sớm vẫn phù hợp. Recall thấp hơn trên SFT v2 phần lớn do
@@ -54,14 +54,27 @@ là lạc quan. Số liệu khách quan lấy từ `guard-eval --final-test`, ch
 
 ## 2. Chính sách
 
-Thứ tự áp dụng: out_of_scope → độ bất định → red flag → tự ý dùng thuốc.
+Thứ tự áp dụng: out_of_scope → độ bất định → phản ứng thuốc → red flag → tự ý dùng thuốc (`safe_policy_v2`).
 
 1. `out_of_scope`: thay câu trả lời bằng mẫu từ chối (online: không gọi model).
 2. `u > τ` (chỉ khi calibration **bật**): `abstain` thì thay bằng mẫu từ chối an toàn + tên tài liệu liên quan;
    `hedge` thì giữ câu trả lời, thêm cảnh báo độ chắc chắn thấp.
-3. red flag: chèn banner (emergency: "Cần đi khám ngay… gọi 115"; prompt: "Nên đi khám sớm…") kèm lý do cụ thể
+3. **Phản ứng thuốc** (`guard.drug_reaction`: dấu hiệu dị ứng/quá mẫn, ngộ độc, tác dụng phụ nặng khi đang dùng
+   thuốc — vd. đau bụng, tiêu chảy khi dùng colchicine; nổi ban khi dùng allopurinol; đau ngực khi dùng febuxostat).
+   Theo góp ý bác sĩ ở đợt duyệt SFT v2 vòng 1 (11/2026): **ngưng thuốc nghi gây phản ứng và đi khám ngay**.
+   - Câu trả lời khuyên "không tự ý ngưng" mà không hề khuyên ngưng → thay bằng banner + hướng dẫn ngưng thuốc
+     (`drug_reaction_override`) — đúng lỗi bác sĩ đã sửa ở dữ liệu SFT.
+   - Câu trả lời chưa khuyên ngưng → chèn hướng dẫn ngưng thuốc (`drug_stop_note`).
+   - Không chèn lưu ý "không tự ý ngừng thuốc" (mâu thuẫn với bác sĩ).
+4. red flag: chèn banner (emergency: "Cần đi khám ngay… gọi 115"; prompt: "Nên đi khám sớm…") kèm lý do cụ thể
    theo luật đã khớp, **trừ khi** câu trả lời đã khuyên đi khám ngay/cấp cứu. Khi đã từ chối thì luôn chèn banner.
-4. self_medication: chèn lưu ý không tự ý dùng/đổi thuốc, trừ khi câu trả lời đã nói rõ điều đó.
+   Đau bụng, tiêu chảy khi dùng colchicine là mức cấp cứu (bác sĩ: "dấu hiệu cảnh báo nguy hiểm").
+5. self_medication: chèn lưu ý không tự ý dùng/đổi thuốc, **kèm ngoại lệ của bác sĩ** (dị ứng, ngộ độc, tác dụng phụ
+   nặng thì phải ngưng và đi khám ngay), trừ khi câu trả lời đã nói rõ. Câu trả lời khuyên "không tự ý ngưng" mà thiếu
+   ngoại lệ → chèn đúng câu ngoại lệ (`drug_exception_note`). Đổi thuốc ("chuyển sang corticoid…") cũng là tự ý dùng
+   thuốc (luật `switch_drug`, guard v2).
+
+`policy.drug_reaction_rule: false` tắt quy tắc phản ứng thuốc — chỉ để làm ablation.
 
 ## 3. Độ bất định — MC Dropout trên LoRA
 

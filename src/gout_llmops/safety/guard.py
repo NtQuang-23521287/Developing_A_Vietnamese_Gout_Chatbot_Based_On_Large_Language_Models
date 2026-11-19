@@ -8,6 +8,10 @@ Nhận diện ba nhóm tình huống trong lời người dùng:
                       corticoid/NSAID kéo dài, bỏ thuốc theo thuốc nam, nhịn đói... (nhóm safety_trap).
   - out_of_scope    : cả hội thoại không có từ khóa nào thuộc lĩnh vực (gút, khớp, thuốc, ăn uống, thận...).
 
+Ngoài ba nhóm trên, `drug_reaction` = đang có dấu hiệu phản ứng thuốc (dị ứng/quá mẫn, ngộ độc, tác dụng phụ
+nặng) khi đang dùng thuốc. Theo góp ý của bác sĩ (duyệt SFT v2 vòng 1, 11/2026): khi đó PHẢI ngưng thuốc nghi gây
+phản ứng và đi khám ngay, KHÔNG được khuyên "không tự ý ngưng thuốc".
+
 Đa số luật chạy trên văn bản đã BỎ DẤU (đ -> d) để bắt cả câu gõ không dấu; vài luật cần phân biệt dấu
 (dừng/dùng) chạy trên văn bản CÓ DẤU (`accented=True`). Guard ưu tiên recall: báo nhầm chỉ làm câu trả lời có
 thêm một đoạn lưu ý, còn bỏ sót red flag là lỗi an toàn.
@@ -21,7 +25,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-GUARD_VERSION = "guard_rules_v1"
+GUARD_VERSION = "guard_rules_v2"   # v2: drug_reaction + luật đổi thuốc (góp ý bác sĩ vòng 1)
 
 RED_FLAG = "red_flag"
 SELF_MEDICATION = "self_medication"
@@ -108,8 +112,9 @@ RULES: tuple[Rule, ...] = (
          (r"tophi|tophus|to phi|\bhat\b|\bcuc\b|\bkhop\b",
           r"chay (mu|dich)|\b(co|ra|mung) mu\b|nhiem trung|vo loet|\bvo ra\b|"
           r"(tophi|hat|cuc)( \w+)? (bi |da )?(vo|loet)\b"), severity=PROMPT),
+    # Bác sĩ (vòng 1): đau bụng, tiêu chảy khi dùng colchicine là dấu hiệu cảnh báo nguy hiểm (ngộ độc/quá liều)
     Rule("colchicine_gi_effect", RED_FLAG,
-         (r"colchicin", r"tieu chay|dau bung|\bnon\b|buon non"), severity=PROMPT),
+         (r"colchicin", r"tieu chay|dau bung|\bnon\b|buon non"), severity=EMERGENCY),
     Rule("home_management_question", RED_FLAG,
          (r"tu xu (tri|ly) (o|tai) nha|theo doi (them )?(o|tai) nha|nam nghi (chut|them)|"
           r"o nha (co )?(duoc|on) khong",
@@ -152,6 +157,8 @@ RULES: tuple[Rule, ...] = (
          (NAMED_DRUGS,
           r"loet da day|da day ta trang|suy than|than man|benh than|soi than|mang thai|co thai|xuat huyet",
           r"duoc khong|co nen|co the (dung|uong)|dung duoc|uong duoc|an toan khong")),
+    Rule("switch_drug", SELF_MEDICATION,
+         (r"\b(chuyen|doi) (sang|qua) (dung |uong |thuoc )?" + NAMED_DRUGS,)),
     Rule("pregnancy_drug", SELF_MEDICATION, (r"mang thai|co thai|co bau|cho con bu", DRUGS)),
     Rule("allergy_rechallenge", SELF_MEDICATION,
          (r"di ung|noi ban|noi man|(phan ung|hoi chung) qua man",
@@ -166,6 +173,13 @@ _DOMAIN = (r"\bgut\b|\bgout\b|thong phong|acid uric|axit uric|\burat|purin|\bkho
            r"thuc pham|an uong|qua|trai cay|rau|chi so|\bchan\b|\btay\b|\bgan\b|vaccin|tiem|kham|"
            r"dieu tri|tac dung phu|nhiem doc|\bbo\b|\bca\b|\bnuoc\b|furic|urictab|" + DRUGS)
 
+# Dấu hiệu phản ứng thuốc: luật red flag mà khi người hỏi ĐANG dùng thuốc thì phải ngưng thuốc nghi gây phản ứng.
+# colchicine_gi_effect đã gắn với colchicine; các luật còn lại cần hội thoại có nhắc tới thuốc.
+DRUG_REACTION_RULES = ("colchicine_gi_effect", "colchicine_toxicity", "severe_drug_reaction",
+                       "chest_pain_dyspnea", "gi_bleeding", "severe_abdominal_pain")
+_ON_MEDICATION = (NAMED_DRUGS + r"|\b(dang )?(dung|uong) thuoc\b|\bthuoc (gut|ha (acid|axit) uric|nam|bac|tri gut|"
+                  r"dieu tri)|\bkhi (dung|uong) (thuoc|no)\b")
+
 
 @dataclass
 class GuardResult:
@@ -173,6 +187,7 @@ class GuardResult:
     rules: list[str] = field(default_factory=list)
     matched_in: dict[str, str] = field(default_factory=dict)   # rule_id -> "current" | "history"
     severity: str | None = None                                 # mức cao nhất của red flag
+    drug_reaction: bool = False                                 # đang có phản ứng thuốc -> ngưng thuốc + đi khám
     version: str = GUARD_VERSION
 
     def has(self, flag: str) -> bool:
@@ -180,7 +195,7 @@ class GuardResult:
 
     def to_dict(self) -> dict:
         return {"flags": list(self.flags), "rules": list(self.rules), "matched_in": dict(self.matched_in),
-                "severity": self.severity, "version": self.version}
+                "severity": self.severity, "drug_reaction": self.drug_reaction, "version": self.version}
 
 
 RULE_BY_ID = {r.rule_id: r for r in RULES}
@@ -212,6 +227,8 @@ def run_guard(question: str, prior_user_turns: list[str] | tuple[str, ...] = (),
             res.flags.append(rule.flag)
         if rule.severity == EMERGENCY or (rule.severity == PROMPT and res.severity is None):
             res.severity = rule.severity
+    res.drug_reaction = (any(r in DRUG_REACTION_RULES for r in res.rules)
+                         and bool(re.search(_ON_MEDICATION, all_p)))
     if not re.search(_DOMAIN, all_p):
         res.flags.append(OUT_OF_SCOPE)
         res.rules.append("no_domain_keyword")
