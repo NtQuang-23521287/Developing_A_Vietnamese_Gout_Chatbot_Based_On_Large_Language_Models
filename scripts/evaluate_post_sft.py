@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Post-SFT evaluation on the Phase-2 v03 benchmark (381 cases / 441 turns).
+"""[LEGACY — chỉ dùng để tái lập SFT v1] Post-SFT evaluation on the Phase-2 v03 benchmark (381 cases / 441 turns).
+
+Script kiểm tra cứng lr/10 epoch của SFT v1 và sinh + chấm cả 381 case (gồm tập test). Từ SFT v3 trở đi dùng
+scripts/eval_adapter.py trên dev (notebook 04, bước 3). Mọi lệnh dưới đây cần thêm --legacy-sft-v1 ngay sau tên script.
 
 Run from the repository root with PYTHONPATH=src, or directly:
     python scripts/evaluate_post_sft.py generate --model qwen3 --dry-run
@@ -238,7 +241,8 @@ def score(args: argparse.Namespace) -> None:
         raise RuntimeError("OPENAI_API_KEY missing. Use Colab Secrets or environment; don't commit keys.")
     command = [sys.executable, str(ROOT / "scripts/score_run_v2.py"),
                "--run", str(run), "--testset", "data/testset_v03/cases_all.jsonl",
-               "--split", "all", "--out-name", "eval_v2_sft_381"]
+               "--split", "all", "--out-name", "eval_v2_sft_381",
+               "--final-test"]   # SFT v1 (legacy) đã được đánh giá trên cả 381 case
     if args.mock:
         command.append("--mock")
     if args.limit is not None:
@@ -261,6 +265,8 @@ def score(args: argparse.Namespace) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--legacy-sft-v1", action="store_true",
+                    help="bắt buộc: script này chỉ dành cho SFT v1 (lr/epoch cứng, chạy cả 381 case gồm test)")
     sub = ap.add_subparsers(dest="command", required=True)
     g = sub.add_parser("generate", help="Load base+LoRA and run Phase-2 RAG generation")
     g.add_argument("--model", choices=tuple(MODELS), required=True)
@@ -278,6 +284,11 @@ def main() -> None:
     v.add_argument("--run", required=True)
     v.add_argument("--limit", type=int, help="For a smoke run")
     args = ap.parse_args()
+    if not args.legacy_sft_v1:
+        ap.error("Script này viết cho SFT v1: kiểm tra cứng lr/10 epoch của SFT v1 và sinh + chấm cả 381 case "
+                 "(gồm tập test). Từ SFT v3 trở đi dùng scripts/eval_adapter.py trên dev "
+                 "(generate/score/gate --split dev, xem notebook 04 bước 3). "
+                 "Chỉ khi tái lập SFT v1: thêm --legacy-sft-v1.")
     os.chdir(ROOT)
     if args.command == "generate":
         if args.limit is not None and not (1 <= args.limit <= 381):
