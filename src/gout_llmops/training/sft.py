@@ -172,6 +172,89 @@ def _dataset_sha256(path: str | Path) -> str:
     return hashlib.sha256(resolve_path(path).read_bytes()).hexdigest()
 
 
+# Train tiếp sau khi Colab ngắt: checkpoint mỗi epoch được chép sang thư mục bền (Drive), phiên sau lấy về
+# rồi Trainer chạy tiếp từ đó. Chỉ train tiếp khi dữ liệu và config giống hệt lần trước.
+RESUME_FINGERPRINT = "resume_fingerprint.json"
+_CHECKPOINT = re.compile(r"^checkpoint-(\d+)$")
+
+
+def run_fingerprint(config: dict[str, Any], audit: dict[str, Any]) -> dict[str, Any]:
+    keys = ("model_id", "revision", "max_seq_length", "train_sha256", "val_sha256")
+    fp = {**{k: audit[k] for k in keys}, "seed": config.get("seed"),
+          "qlora": config.get("qlora"), "trainer": config.get("trainer")}
+    return json.loads(json.dumps(fp))   # cùng kiểu dữ liệu với bản đọc lại từ file
+
+
+def _checkpoints(directory: Path) -> list[Path]:
+    """checkpoint-N đã lưu xong (có trainer_state.json), N tăng dần."""
+    if not directory.is_dir():
+        return []
+    found = [(int(m.group(1)), d) for d in directory.iterdir()
+             if d.is_dir() and (m := _CHECKPOINT.match(d.name)) and (d / "trainer_state.json").exists()]
+    return [d for _, d in sorted(found)]
+
+
+def last_checkpoint(directory: Path) -> Path | None:
+    found = _checkpoints(directory)
+    return found[-1] if found else None
+
+
+def prepare_resume(output_dir: Path, fingerprint: dict[str, Any], resume: bool) -> Path | None:
+    """Checkpoint để train tiếp (None = train từ đầu); ghi fingerprint của lần train này."""
+    last, path = last_checkpoint(output_dir), output_dir / RESUME_FINGERPRINT
+    if last is not None:
+        if not resume:
+            raise RuntimeError(f"{output_dir} đã có {last.name} của lần train trước: thêm --resume để train "
+                               "tiếp, hoặc xoá thư mục này để train lại từ đầu")
+        old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        diff = sorted(k for k in fingerprint if old.get(k) != fingerprint[k])
+        if diff:
+            raise RuntimeError(f"Không train tiếp từ {last.name}: khác lần train trước ở {', '.join(diff)} "
+                               f"(hoặc thiếu {RESUME_FINGERPRINT}). Xoá {output_dir} để train lại từ đầu")
+        print(f"Train tiếp từ {last.name}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(fingerprint, ensure_ascii=False, indent=2), encoding="utf-8")
+    return last
+
+
+def check_mirror_dir(output_dir: Path, mirror: Path) -> None:
+    # Bản sao phải là thư mục riêng của run này: mirror_checkpoints xoá checkpoint cũ trong đó
+    if mirror.name != output_dir.name:
+        raise ValueError(f"--checkpoint-mirror phải là thư mục tên {output_dir.name}, nhận {mirror}")
+
+
+def mirror_checkpoints(src: Path, dst: Path) -> None:
+    """Chép file gốc và checkpoint mới của src sang dst. Checkpoint được chép vào tên tạm rồi mới đổi
+    tên, nên dst không bao giờ có checkpoint dở dang; checkpoint Trainer đã xoá ở src cũng bị xoá ở dst."""
+    import shutil
+    dst.mkdir(parents=True, exist_ok=True)
+    for stale in [*dst.glob(".tmp-checkpoint-*"), *src.glob(".tmp-checkpoint-*")]:
+        shutil.rmtree(stale, ignore_errors=True)
+    for f in src.iterdir():
+        if f.is_file():
+            shutil.copy2(f, dst / f.name)
+    keep = {d.name for d in _checkpoints(src)}
+    for name in sorted(keep - {d.name for d in _checkpoints(dst)}):
+        tmp = dst / f".tmp-{name}"
+        shutil.copytree(src / name, tmp)
+        tmp.rename(dst / name)
+    for d in _checkpoints(dst):
+        if d.name not in keep:
+            shutil.rmtree(d)
+
+
+def pull_checkpoints(mirror: Path, output_dir: Path) -> None:
+    """Phiên mới: output_dir chưa có checkpoint thì lấy từ bản sao."""
+    import shutil
+    if last_checkpoint(output_dir) is not None or last_checkpoint(mirror) is None:
+        return
+    for d in _checkpoints(mirror):
+        shutil.copytree(d, output_dir / d.name, dirs_exist_ok=True)
+    if (mirror / RESUME_FINGERPRINT).exists():
+        shutil.copy2(mirror / RESUME_FINGERPRINT, output_dir / RESUME_FINGERPRINT)
+    print(f"Lấy {len(_checkpoints(output_dir))} checkpoint từ {mirror}")
+
+
 def _get_tok(model_id: str, revision: str, trust_remote_code: bool):
     from transformers import AutoTokenizer
     try:
@@ -246,11 +329,15 @@ def _load_model(family: str, model_cfg: dict[str, Any], max_length: int,
 
 
 def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
-              smoke_test: bool = False, allow_draft: bool = False) -> None:
+              smoke_test: bool = False, allow_draft: bool = False,
+              resume: bool = False, mirror_dir: str | None = None) -> None:
     family, model_cfg = identify_model(config)
     train_file = config.get("train_data", "data/sft_v2/train.jsonl")
     val_file = config.get("val_data", "data/sft_v2/val.jsonl")
     output_dir = resolve_path(config.get("output_dir", f"artifacts/runs/sft_{family}_v2"))
+    mirror = resolve_path(mirror_dir) if mirror_dir else None
+    if mirror is not None:
+        check_mirror_dir(output_dir, mirror)
     max_length = int(config.get("max_seq_length", 2048))
     if max_length < 128:
         raise ValueError("max_seq_length must be >= 128")
@@ -299,6 +386,11 @@ def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
         if not smoke_test and entry["fit_count"] / entry["original_count"] < min_ratio:
             raise RuntimeError(f"Too few rows fit token budget in {entry['split']}; "
                                "consider editing answers, not silent truncate")
+    resume_from = None
+    if not smoke_test:
+        if mirror is not None:
+            pull_checkpoints(mirror, output_dir)
+        resume_from = prepare_resume(output_dir, run_fingerprint(config, audit), resume)
 
     import torch
     from datasets import Dataset
@@ -356,19 +448,34 @@ def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
                         )
             return control
 
+    def mirror_now(step: int | None = None) -> None:
+        try:
+            mirror_checkpoints(output_dir, mirror)
+            print(f"Đã chép {'checkpoint bước ' + str(step) if step else 'adapter'} sang {mirror}")
+        except OSError as exc:   # Drive lỗi: train vẫn chạy tiếp, chỉ mất khả năng train tiếp ở phiên sau
+            print(f"[!] Không chép được sang {mirror}: {exc}")
+
+    class MirrorCheckpoints(TrainerCallback):
+        def on_save(self, args, state, control, **kwargs):
+            mirror_now(state.global_step)
+            return control
+
+    callbacks = [StopOnNonFiniteLoss()]
+    if mirror is not None and not smoke_test:
+        callbacks.append(MirrorCheckpoints())
     collator = AssistantOnlyCollator(pad_token_id=tokenizer.pad_token_id)
     trainer = SFTTrainer(
         model=model, args=args, processing_class=model_tokenizer,
         train_dataset=Dataset.from_list(train_rows),
         eval_dataset=Dataset.from_list(val_rows), data_collator=collator,
-        callbacks=[StopOnNonFiniteLoss()],
+        callbacks=callbacks,
     )
     testbatch = collator([train_rows[0]])
     assert (testbatch["labels"] == -100).any() and (testbatch["labels"] != -100).any()
     print(f"GPU: {torch.cuda.get_device_name(0)}, bf16={use_bf16}, "
           f"steps={'2 (SMOKE)' if smoke_test else 'full'}, "
           f"effective train samples={len(train_rows)}, val={len(val_rows)}")
-    result = trainer.train()
+    result = trainer.train(resume_from_checkpoint=str(resume_from) if resume_from else None)
     if not bool(torch.isfinite(torch.tensor(float(result.training_loss)))):
         raise RuntimeError("Non-finite training_loss! Stop; Gemma3/T4 precision combination might be unstable")
     if smoke_test:
@@ -386,9 +493,12 @@ def train_sft(config: dict[str, Any], *, preflight_only: bool = False,
         "train_sha256": audit["train_sha256"], "val_sha256": audit["val_sha256"],
         "medical_answers_approved": medical_reviewed,
         "research_only_draft": not medical_reviewed,
+        "resumed_from_checkpoint": resume_from.name if resume_from else None,
         "config": config,
     }
     (output_dir / "sft_run_metadata.json").write_text(json.dumps(runmeta, ensure_ascii=False, indent=2),
                                                       encoding="utf-8")
+    if mirror is not None:
+        mirror_now()
     print(f"DONE SFT {family}. Adapter at {output_dir}. "
           + ("WARNING: RESEARCH-ONLY draft answers." if not medical_reviewed else ""))

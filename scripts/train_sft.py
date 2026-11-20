@@ -21,12 +21,18 @@ def main():
     g.add_argument("--smoke-test", action="store_true", help="2 GPU steps, no adapter saved")
     p.add_argument("--full-test", action="store_true",
                    help="Explicitly authorize RESEARCH-ONLY full train on unreviewed QA")
+    p.add_argument("--resume", action="store_true",
+                   help="Train tiếp từ checkpoint mới nhất trong output_dir (dữ liệu và config phải giống lần trước)")
+    p.add_argument("--checkpoint-mirror", default=None,
+                   help="Thư mục bền cùng tên với output_dir (vd. trên Drive): nhận checkpoint sau mỗi epoch; "
+                        "output_dir chưa có checkpoint thì lấy từ đây")
     args = p.parse_args()
     cfg = args.config or CONFIGS[args.model]
     data = load_yaml(cfg)
     print(f"Using config: {cfg}")
     train_sft(data, preflight_only=args.preflight_only,
-              smoke_test=args.smoke_test, allow_draft=args.full_test)
+              smoke_test=args.smoke_test, allow_draft=args.full_test,
+              resume=args.resume, mirror_dir=args.checkpoint_mirror)
 
 
 if __name__ == "__main__":
