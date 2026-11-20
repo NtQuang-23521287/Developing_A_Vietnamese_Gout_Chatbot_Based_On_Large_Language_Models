@@ -5,6 +5,7 @@ from pathlib import Path
 from gout_llmops.core.hashing import sha256_file
 from gout_llmops.core.io import ensure_dir, write_json, write_jsonl
 from gout_llmops.rag.chunking import Chunk
+from gout_llmops.rag.segment import get_segmenter
 
 
 def build_faiss_index(chunks: list[Chunk], config: dict) -> dict:
@@ -17,7 +18,8 @@ def build_faiss_index(chunks: list[Chunk], config: dict) -> dict:
     out_dir = ensure_dir(config["output_dir"])
     emb_cfg = config["embedding"]
     model = SentenceTransformer(emb_cfg["model_id"], revision=emb_cfg.get("revision"))
-    texts = [c.text for c in chunks]
+    segment = get_segmenter(emb_cfg.get("word_segmentation"))
+    texts = [segment(c.text) for c in chunks]  # chỉ vector dùng văn bản đã tách từ; chunks.jsonl giữ nguyên văn
     vectors = model.encode(
         texts,
         convert_to_numpy=True,

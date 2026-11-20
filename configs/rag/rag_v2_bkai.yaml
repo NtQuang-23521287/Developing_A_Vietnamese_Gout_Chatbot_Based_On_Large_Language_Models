@@ -1,0 +1,39 @@
+# RAG v2 (ứng viên, CHỈ dùng cho ablation): cùng KB 86 chunk với rag_v1, embedding bkai (tách từ pyvi), không reranker.
+# Benchmark trên dev (artifacts/reports/rag/retrieval_benchmark_dev.md, 104 câu một lượt): đoạn bằng chứng nằm trong
+# 3 đoạn đưa vào prompt ở 83,7% câu, so với 64,4% của rag_v1 (MiniLM + reranker); chênh +19,2 điểm %, McNemar p = 0,001.
+# Mọi so sánh model (cổng, SFT, DPO, Safe Inference) vẫn dùng rag_v1: đổi retriever giữa chừng làm các mốc không so
+# được với nhau, còn dữ liệu SFT v2.1 lấy context bằng rag_v1. Cổng từ chối so run rag_v2 với run rag_v1.
+# Dựng index: pip install -e '.[rag,rag-vi]' && python scripts/build_kb.py --config configs/rag/rag_v2_bkai.yaml
+name: gout_kb_v1_bkai
+output_dir: artifacts/kb/gout_kb_v1_bkai
+
+sources:
+  - source_id: local_guidelines_prechunked
+    path: data/kb/chunks/kb_chunks.jsonl
+    kind: prechunked_jsonl
+    tier: core
+    review_status: reviewed_for_rag_v1
+
+  - source_id: acr2020_prechunked
+    path: data/kb/chunks/doc003_chunks.jsonl
+    kind: prechunked_jsonl
+    tier: core
+    review_status: reviewed_for_rag_v1
+
+chunking:
+  method: prebuilt_jsonl_v1
+  expected_chunks: 86
+
+embedding:
+  model_id: bkai-foundation-models/vietnamese-bi-encoder
+  revision: 84f9d9ada0d1a3c37557398b9ae9fcedcdf40be0
+  normalize_embeddings: true
+  word_segmentation: pyvi   # bkai huấn luyện trên văn bản đã tách từ; tách cả chunk lẫn câu hỏi
+
+retrieval:
+  retrieve_k: 12
+  top_k: 3
+  query_policy: current_question_only
+
+reranker:
+  enabled: false   # benchmark: reranker làm bkai giảm từ 83,7% xuống 76,0% (p = 0,13)

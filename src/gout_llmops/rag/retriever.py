@@ -1,9 +1,26 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from gout_llmops.core.io import read_jsonl
+from gout_llmops.rag.segment import embedding_identity, get_segmenter
+
+
+def check_index_embedding(index_dir: str | Path, emb_cfg: dict) -> None:
+    """Index phải dựng bằng đúng embedding của config truy xuất.
+
+    Hai model cùng số chiều thì FAISS vẫn chạy, chỉ là kết quả vô nghĩa, nên phải so với manifest của index.
+    """
+    manifest = Path(index_dir) / "manifest.json"
+    if not manifest.exists():
+        return
+    built = embedding_identity(json.loads(manifest.read_text(encoding="utf-8")).get("embedding") or {})
+    wanted = embedding_identity(emb_cfg)
+    if built != wanted:
+        raise RuntimeError(f"Index {index_dir} dựng bằng {built} nhưng config truy xuất dùng {wanted}. "
+                           "Dựng index đúng config: python scripts/build_kb.py --config <rag config>")
 
 
 class FaissRetriever:
@@ -20,8 +37,10 @@ class FaissRetriever:
         self.index = faiss.read_index(str(self.index_dir / "index.faiss"))
         self.chunks = read_jsonl(self.index_dir / "chunks.jsonl")
         emb = rag_config["embedding"]
+        check_index_embedding(self.index_dir, emb)
         self.encoder = SentenceTransformer(emb["model_id"], revision=emb.get("revision"))
         self.normalize = bool(emb.get("normalize_embeddings", True))
+        self.segment = get_segmenter(emb.get("word_segmentation"))
         self.reranker = None
         rerank = rag_config.get("reranker", {})
         if rerank.get("enabled"):
@@ -29,9 +48,13 @@ class FaissRetriever:
             # SFT v1) chạy không có reranker trong khi config bật -> protocol lệch mà không ai biết.
             try:
                 from FlagEmbedding import FlagReranker
-                self.reranker = FlagReranker(
-                    rerank["model_id"], use_fp16=True, trust_remote_code=True
-                )
+                path = rerank["model_id"]
+                if rerank.get("revision"):
+                    # Nạp đúng revision ghi trong config. Trước đây revision bị bỏ qua và luôn nạp bản mới nhất
+                    # (đến 2026-11-20 bản mới nhất vẫn trùng revision đã ghim nên các run cũ không bị ảnh hưởng).
+                    from huggingface_hub import snapshot_download
+                    path = snapshot_download(rerank["model_id"], revision=rerank["revision"])
+                self.reranker = FlagReranker(path, use_fp16=True, trust_remote_code=True)
             except Exception as e:
                 raise RuntimeError(
                     f"Config bật reranker ({rerank.get('model_id')}) nhưng không nạp được: {type(e).__name__}: {e}. "
@@ -43,8 +66,8 @@ class FaissRetriever:
         rcfg = self.cfg["retrieval"]
         retrieve_k = int(rcfg.get("retrieve_k", 12))
         top_k = int(rcfg.get("top_k", 3))
-        q = self.encoder.encode(
-            [query], convert_to_numpy=True, normalize_embeddings=self.normalize
+        q = self.encoder.encode(  # embedding nhận câu hỏi đã tách từ (nếu config yêu cầu); reranker nhận nguyên văn
+            [self.segment(query)], convert_to_numpy=True, normalize_embeddings=self.normalize
         ).astype("float32")
         scores, ids = self.index.search(q, retrieve_k)
         candidates = []

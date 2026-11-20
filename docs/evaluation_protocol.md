@@ -45,6 +45,28 @@ Hệ quả và cách xử lý:
   (notebook 04, bước 0, `qwen3_8b_base_rerank`). So run đó với run Giai đoạn 2 cho ablation có/không reranker.
 - `FaissRetriever` giờ báo lỗi khi config bật reranker mà không nạp được. `eval_adapter.py gate` từ chối so hai run
   khác protocol truy xuất; `compare_runs_v2.py` in cảnh báo (`src/gout_llmops/evaluation/protocol_check.py`).
+- Từ 20/11/2026, "protocol truy xuất" gồm cả embedding (model, revision, tách từ) đọc từ `rag_config.json` của run.
+  Reranker nạp đúng revision ghi trong config (trước đó luôn nạp bản mới nhất, khi kiểm tra vẫn trùng revision đã ghim).
+
+## Benchmark truy xuất và ablation retriever (20/11/2026)
+
+`scripts/benchmark_retrieval.py` đo truy xuất trên KB thật so với `evidence_chunk_ids` của testset v03: 104 câu một
+lượt của dev (bỏ 9 hội thoại nhiều lượt, 1 câu không có nhãn), mỗi embedding lấy 12 đoạn, có/không reranker giữ 3.
+Chạy trên CPU; muốn có reranker thì cần `FlagEmbedding`, còn bkai cần `pip install -e '.[rag-vi]'`.
+
+```bash
+PYTHONPATH=src python3 scripts/benchmark_retrieval.py --split dev \
+    --check-run artifacts/runs/20261025T074006Z_baseline_qwen3_8b_7963   # đối chiếu top-3 với một run thật
+```
+
+Kết quả (`artifacts/reports/rag/retrieval_benchmark_dev.md`): Hit@3 của cấu hình đang dùng (MiniLM + reranker) là
+64,4%; bkai không reranker đạt 83,7% (+19,2 điểm %, McNemar p = 0,001). Nhãn bằng chứng chỉ trỏ vào 30 chunk, gần như
+toàn bộ thuộc hai tài liệu trong nước, nên các số là cận dưới. Theo luật đã định trước, các thí nghiệm vẫn dùng
+`rag_v1`: đổi retriever giữa chừng làm các mốc không so được với nhau, và dữ liệu SFT v2.1 lấy context bằng `rag_v1`.
+
+Ablation đầu-cuối (notebook 04, bước 0R): `eval_adapter.py generate --rag-config configs/rag/rag_v2_bkai.yaml`
+sinh với bkai (index dựng sẵn ở `artifacts/kb/gout_kb_v1_bkai`), rồi `compare_runs_v2.py` so với run `rag_v1` cùng
+model. Kết quả chỉ dùng để báo cáo, không đưa vào cổng.
 
 ## Chốt chặn tập test (từ 19/11/2026)
 

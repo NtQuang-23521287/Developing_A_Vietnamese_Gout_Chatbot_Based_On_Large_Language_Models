@@ -1,0 +1,40 @@
+{
+  "name": "gout_kb_v1_bkai",
+  "source_inputs": [
+    {
+      "source_id": "local_guidelines_prechunked",
+      "path": "data/kb/chunks/kb_chunks.jsonl",
+      "sha256": "47e2c4c7b1b522742b5ccab24c705fa119cdb1064beef52c534786f48e171563",
+      "tier": "core",
+      "review_status": "reviewed_for_rag_v1"
+    },
+    {
+      "source_id": "acr2020_prechunked",
+      "path": "data/kb/chunks/doc003_chunks.jsonl",
+      "sha256": "2fdfb765273b88f2b1e0ee6ac6d7a113d110bdfbe4d224d8a04a1abf05d6d1de",
+      "tier": "core",
+      "review_status": "reviewed_for_rag_v1"
+    }
+  ],
+  "documents_chunked": 86,
+  "embedding": {
+    "model_id": "bkai-foundation-models/vietnamese-bi-encoder",
+    "revision": "84f9d9ada0d1a3c37557398b9ae9fcedcdf40be0",
+    "normalize_embeddings": true,
+    "word_segmentation": "pyvi"
+  },
+  "chunking": {
+    "method": "prebuilt_jsonl_v1",
+    "expected_chunks": 86
+  },
+  "retrieval": {
+    "retrieve_k": 12,
+    "top_k": 3,
+    "query_policy": "current_question_only"
+  },
+  "reranker": {
+    "enabled": false
+  },
+  "index_sha256": "8acd795f5affc707a58dd11cc7d711fc02193d75b52948445ab624488519a154",
+  "chunks_sha256": "d0a430a05729befa85b328f8efa3c699ab8f55605699bd0d6a5de7edcd99c55a"
+}
