@@ -34,6 +34,7 @@ from gout_llmops.evaluation.retrieval_metrics import (
     reciprocal_rank,
     wilson_ci,
 )
+from gout_llmops.rag.segment import get_segmenter
 
 EMBEDDERS = {  # alias -> (model_id, cần tách từ). MiniLM lấy model_id + revision từ rag config.
     "minilm": (None, False),
@@ -61,11 +62,12 @@ def load_queries(testset: str, split: str, kb_ids: set[str]) -> tuple[list[dict]
 
 
 def _segment(texts: list[str]) -> list[str]:
+    """Tách từ bằng đúng hàm FaissRetriever dùng khi config có word_segmentation: pyvi."""
     try:
-        from pyvi.ViTokenizer import tokenize
-    except ImportError as e:
-        raise SystemExit("bkai cần tách từ tiếng Việt: pip install pyvi") from e
-    return [tokenize(t) for t in texts]
+        segment = get_segmenter("pyvi")
+    except RuntimeError as e:
+        raise SystemExit(str(e)) from e
+    return [segment(t) for t in texts]
 
 
 def _resolved_sha(model_id: str, revision: str | None) -> str | None:

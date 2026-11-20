@@ -11,6 +11,9 @@ Ví dụ (Colab, từ thư mục gốc repo):
 
 Chọn model/checkpoint CHỈ dựa trên dev (114 case). Tập test (267 case) chạy MỘT lần ở cuối cho các cấu hình đã chốt
 (phải thêm --final-test để tránh vô tình dùng test để tinh chỉnh).
+
+Ablation retriever: generate --rag-config configs/rag/rag_v2_bkai.yaml sinh với cấu hình RAG khác rag_v1. Cổng
+từ chối so run đó với run rag_v1 (khác protocol truy xuất); dùng compare_runs_v2.py để đo chênh lệch.
 """
 from __future__ import annotations
 
@@ -62,6 +65,11 @@ def generate(args) -> None:
     eval_cfg["name"] = f"{args.name}_{args.split}"
     eval_cfg.setdefault("judge", {})["enabled"] = False   # judge v1 trong runner phải TẮT; chấm bằng v2 ở bước score
     eval_cfg.setdefault("ragas", {})["enabled"] = False
+    if args.rag_config:
+        rag_dir = load_yaml(args.rag_config)["output_dir"]
+        if not (Path(rag_dir) / "index.faiss").exists():
+            raise SystemExit(f"Chưa có index {rag_dir}: python scripts/build_kb.py --config {args.rag_config}")
+        eval_cfg["rag"]["config"], eval_cfg["rag"]["index_dir"] = args.rag_config, rag_dir
     cfg_dir = Path("artifacts/reports/eval_configs")
     cfg_dir.mkdir(parents=True, exist_ok=True)
     model_yaml, eval_yaml = cfg_dir / f"{args.name}_model.yaml", cfg_dir / f"{args.name}_{args.split}_eval.yaml"
@@ -182,6 +190,8 @@ def main() -> None:
     g.add_argument("--name", required=True, help="tên run, ví dụ qwen3_8b_sft_v3")
     g.add_argument("--adapter", default=None, help="thư mục LoRA adapter; bỏ trống = model gốc")
     g.add_argument("--model-config", default="configs/models/qwen3_8b.yaml")
+    g.add_argument("--rag-config", default=None,
+                   help="config RAG thay rag_v1, chỉ để ablation retriever (cổng từ chối so với run rag_v1)")
     g.add_argument("--split", choices=list(SPLIT_FILES), default="dev")
     g.add_argument("--limit", type=int, default=None, help="chỉ N case đầu (smoke test)")
     g.add_argument("--final-test", action="store_true")

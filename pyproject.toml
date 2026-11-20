@@ -24,6 +24,9 @@ rag = [
   "faiss-cpu>=1.8",
   "FlagEmbedding>=1.2.11",
 ]
+rag-vi = [
+  "pyvi==0.1.1",  # tách từ tiếng Việt cho embedding bkai (configs/rag/rag_v2_bkai.yaml)
+]
 model = [
   "torch>=2.3",
   "transformers>=4.51",

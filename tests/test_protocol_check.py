@@ -22,6 +22,23 @@ def test_profile_counts_only_ok_turns_with_context(tmp_path):
     assert retrieval_profile(_run(tmp_path, "r2", rerank=True), case_ids={"a"})["n_turns_with_context"] == 1
 
 
+def _rag(run, **emb):
+    cfg = {"embedding": {"model_id": "minilm", "revision": "r1", "normalize_embeddings": True, **emb}}
+    (run / "rag_config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    return run
+
+
+def test_mismatch_detects_embedding(tmp_path):
+    a = _rag(_run(tmp_path, "a", rerank=True))
+    assert retrieval_mismatch([a, _rag(_run(tmp_path, "b", rerank=True))]) is None
+    msg = retrieval_mismatch([a, _rag(_run(tmp_path, "c", rerank=True), model_id="bkai", word_segmentation="pyvi")])
+    assert msg and "bkai" in msg and "pyvi" in msg
+    assert retrieval_mismatch([a, _rag(_run(tmp_path, "d", rerank=True), revision="r2")]) is not None
+    # thiếu revision = không rõ; run không lưu rag_config.json thì chỉ so context
+    assert retrieval_mismatch([a, _rag(_run(tmp_path, "e", rerank=True), revision=None)]) is None
+    assert retrieval_mismatch([a, _run(tmp_path, "f", rerank=True)]) is None
+
+
 def test_mismatch_detects_reranker_and_top_k(tmp_path):
     a = _run(tmp_path, "a", rerank=False)
     assert retrieval_mismatch([a, _run(tmp_path, "b", rerank=False)]) is None
