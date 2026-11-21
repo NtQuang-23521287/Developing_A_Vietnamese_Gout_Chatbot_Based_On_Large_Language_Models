@@ -26,6 +26,7 @@ trainer:
   warmup_ratio: 0.1
   lr_scheduler_type: cosine
   logging_steps: 5
+  save_steps: 5           # lưu checkpoint mỗi 5 bước (~40 cặp) để Colab ngắt thì train tiếp, mất ít
   optim: paged_adamw_8bit
   precompute_ref_log_probs: true   # tính log-prob của reference một lần trước khi train, tiết kiệm VRAM
   use_logits_to_keep: true         # chỉ tính logits phần câu trả lời (vocab Qwen 152k rất tốn bộ nhớ)

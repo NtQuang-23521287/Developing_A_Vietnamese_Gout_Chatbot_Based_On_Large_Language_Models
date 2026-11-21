@@ -21,7 +21,7 @@ Hệ thống LLMOps cho khóa luận **Chatbot tư vấn bệnh Gout tiếng Vi�
 | Giai đoạn 1 – Hạ tầng dữ liệu & khung đánh giá | `src/gout_llmops/data`, `rag`, `evaluation`, DVC, MLflow |
 | Giai đoạn 2 – Tuyển chọn mô hình nền | `scripts/run_baseline.py`, `configs/models/*` |
 | Giai đoạn 3 – SFT | `src/gout_llmops/training/sft.py`, `configs/training/sft_v1.yaml` |
-| Giai đoạn 4 – DPO | `src/gout_llmops/training/dpo.py`, `configs/training/dpo_v1.yaml` |
+| Giai đoạn 4 – DPO | `scripts/dpo_pipeline.py`, `src/gout_llmops/training/dpo.py`, `configs/training/dpo_v1.yaml` (Qwen3-8B), `configs/training/dpo_gemma3_4b_v1.yaml` (Gemma3-4B) |
 | Giai đoạn 5 – Safe Inference & triển khai | `src/gout_llmops/safety`, `serving` |
 
 ## 3. Cấu trúc
