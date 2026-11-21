@@ -3,15 +3,15 @@ import shutil
 
 import pytest
 
-from gout_llmops.training.sft import (
+from gout_llmops.training.resume import (
     RESUME_FINGERPRINT,
     check_mirror_dir,
     last_checkpoint,
     mirror_checkpoints,
     prepare_resume,
     pull_checkpoints,
-    run_fingerprint,
 )
+from gout_llmops.training.sft import run_fingerprint
 
 AUDIT = {"model_id": "google/gemma-3-4b-it", "revision": "r", "max_seq_length": 3072,
          "train_sha256": "a", "val_sha256": "b"}

@@ -1,0 +1,34 @@
+# Giai đoạn 4 — DPO v1 cho Gemma3-4B, cùng siêu tham số với dpo_v1.yaml (Qwen3-8B) để hai mô hình so được với nhau.
+# Chạy: python scripts/dpo_pipeline.py train --config configs/training/dpo_gemma3_4b_v1.yaml
+# Ứng viên sinh bằng: dpo_pipeline.py generate/score/mine --model-config configs/models/gemma3_4b.yaml
+# (ghi vào artifacts/dpo_v1/gemma3_4b và data/dpo/gemma3_4b, tách khỏi dữ liệu của Qwen).
+name: dpo_gemma3_4b_v1
+status: ready
+base_model_config: configs/models/gemma3_4b.yaml
+# Adapter SFT dùng làm policy VÀ reference (nạp hai lần, bản "ref" đóng băng). Đặt null (hoặc --policy-adapter none)
+# để DPO thẳng trên Gemma gốc khi SFT không qua cổng. Phải trùng policy đã sinh ứng viên (dữ liệu on-policy).
+policy_adapter: artifacts/runs/sft_gemma3_4b_v3_1
+preference_data: data/dpo/gemma3_4b/preference_v1.jsonl
+output_dir: artifacts/runs/dpo_gemma3_4b_v1
+seed: 2026
+eval_ratio: 0.1
+max_length: 2048          # prompt (system + 3 chunk RAG + lịch sử) ~1.000–1.400 token + câu trả lời ≤ 512
+max_prompt_length: 1536
+new_lora:                 # chỉ dùng khi policy_adapter = null (chỉ gắn vào lớp ngôn ngữ của Gemma)
+  r: 16
+  alpha: 32
+  dropout: 0.05           # > 0 để dùng được MC Dropout trên LoRA ở Giai đoạn 5
+trainer:
+  beta: 0.1
+  loss_type: sigmoid
+  learning_rate: 0.00001
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  warmup_ratio: 0.1
+  lr_scheduler_type: cosine
+  logging_steps: 5
+  save_steps: 5           # lưu checkpoint mỗi 5 bước (~40 cặp) để Colab ngắt thì train tiếp, mất ít
+  optim: paged_adamw_8bit
+  precompute_ref_log_probs: true   # tính log-prob của reference một lần trước khi train, tiết kiệm VRAM
+  use_logits_to_keep: true         # TRL 0.x: chỉ tính logits phần câu trả lời (TRL 1.x bỏ tham số này)

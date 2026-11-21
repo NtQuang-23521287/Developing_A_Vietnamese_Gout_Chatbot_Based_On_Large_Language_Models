@@ -1,6 +1,8 @@
 """Giai đoạn 4 — DPO: sinh ứng viên -> chấm Heuristic Reward v2 -> Preference Mining -> train DPO.
 
-  generate : policy (Qwen gốc hoặc Qwen + adapter SFT) sinh K câu trả lời cho mỗi câu hỏi, có RAG, sampling.
+  generate : policy (mô hình gốc hoặc mô hình + adapter SFT) sinh K câu trả lời cho mỗi câu hỏi, có RAG, sampling.
+             --model-config chọn mô hình (mặc định Qwen3-8B); mô hình khác ghi vào thư mục con riêng
+             (vd. artifacts/dpo_v1/gemma3_4b, data/dpo/gemma3_4b) -> score/mine cũng phải truyền cùng --model-config.
              Ghi từng câu ngay khi xong -> Colab ngắt thì chạy lại lệnh, nó làm tiếp phần còn thiếu.
   score    : Judge v2 chấm từng ứng viên, Reward v2 tính R(x,c,y) theo công thức (1)–(3) của đề cương.
   mine     : chọn cặp Chosen/Rejected theo Preference Mining Rule (src/gout_llmops/training/preference.py).
@@ -17,6 +19,8 @@ Ví dụ (Colab, từ thư mục gốc repo):
   python scripts/dpo_pipeline.py mine
   python scripts/dpo_pipeline.py train --config configs/training/dpo_v1.yaml --smoke-test
   python scripts/dpo_pipeline.py train --config configs/training/dpo_v1.yaml
+  Gemma3-4B: thêm --model-config configs/models/gemma3_4b.yaml vào generate/score/mine,
+  train bằng --config configs/training/dpo_gemma3_4b_v1.yaml.
 Thử toàn bộ luồng không cần GPU/API: thêm --mock vào generate/score/mine (ghi vào artifacts/dpo_v1_mock).
 """
 from __future__ import annotations
@@ -44,7 +48,7 @@ from gout_llmops.evaluation.judge_v2 import (
     validate_judge_output,
 )
 from gout_llmops.evaluation.reward_v2 import compute_reward_v2, validate_config
-from gout_llmops.training.dpo import check_adapter_dir, resolve_policy
+from gout_llmops.training.dpo import check_adapter_dir, render_prompt, resolve_policy
 from gout_llmops.training.preference import (
     DEFAULT_RULE,
     RULE_VERSION,
@@ -55,15 +59,24 @@ from gout_llmops.training.preference import (
 )
 
 SYSTEM_PROMPT_PATH = "prompts/system_vi_v1.txt"
-MODEL_CONFIG = "configs/models/qwen3_8b.yaml"
+DEFAULT_MODEL_CONFIG = "configs/models/qwen3_8b.yaml"
 EVAL_PROTOCOL = "configs/evaluation/baseline_v03_381.yaml"
 PRICE_PER_M = {"gpt-4o-mini": (0.15, 0.60), "gpt-4.1-mini": (0.40, 1.60)}
 
 
+def model_tag(model_config: str) -> str:
+    """Thư mục con cho từng mô hình. Qwen3-8B giữ đường dẫn cũ (artifacts/dpo_v1, data/dpo) để không mất ứng viên
+    đã sinh."""
+    name = load_yaml(model_config).get("name") or Path(model_config).stem
+    return "" if name == "qwen3_8b" else name
+
+
 class Paths:
-    def __init__(self, mock: bool):
-        self.work = Path("artifacts/dpo_v1_mock" if mock else "artifacts/dpo_v1")
-        self.pref_dir = self.work / "data" if mock else Path("data/dpo")
+    def __init__(self, mock: bool, model_config: str = DEFAULT_MODEL_CONFIG):
+        tag = model_tag(model_config)
+        base = Path("artifacts/dpo_v1_mock" if mock else "artifacts/dpo_v1")
+        self.work = base / tag if tag else base
+        self.pref_dir = self.work / "data" if mock else (Path("data/dpo") / tag if tag else Path("data/dpo"))
         self.cands = self.work / "candidates.jsonl"
         self.meta = self.work / "candidates_meta.json"
         self.scored = self.work / "scored.jsonl"
@@ -89,6 +102,18 @@ def _mock_candidates(row: dict[str, Any], k: int) -> list[dict[str, Any]]:
              "truncated": False} for i in range(k)]
 
 
+GENERATION_KEYS = ("model_config", "policy_adapter", "prompts_sha256", "k", "include_greedy", "temperature", "top_p",
+                   "top_k", "max_new_tokens", "seed")
+
+
+def generation_meta_diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
+    """Khác biệt cấu hình sinh giữa lần trước và lần này. Meta cũ không ghi model_config = Qwen3-8B (mặc định cũ)."""
+    def norm(meta: dict[str, Any]) -> dict[str, Any]:
+        return {**meta, "model_config": str(Path(meta.get("model_config") or DEFAULT_MODEL_CONFIG))}
+    old, new = norm(old), norm(new)
+    return {k: (old.get(k), new.get(k)) for k in GENERATION_KEYS if old.get(k) != new.get(k)}
+
+
 def stage_generate(args, P: Paths) -> None:
     system_prompt = Path(SYSTEM_PROMPT_PATH).read_text(encoding="utf-8")
     protocol = load_yaml(EVAL_PROTOCOL)
@@ -103,16 +128,13 @@ def stage_generate(args, P: Paths) -> None:
                          "(hoặc --prompts artifacts/sft_v2/filtered.jsonl nếu cố ý dùng dữ liệu chưa duyệt).")
     rows = [r for r in read_jsonl(args.prompts) if r.get("answers") and r.get("contexts")]
     selected = select_prompts(rows, args.max_prompts, args.seed)
-    meta = {"policy_adapter": policy, "model_config": MODEL_CONFIG, "prompts_file": args.prompts,
+    meta = {"policy_adapter": policy, "model_config": str(Path(args.model_config)), "prompts_file": args.prompts,
             "prompts_sha256": sha256_file(args.prompts), "n_prompts_selected": len(selected),
             "k": args.k, "include_greedy": args.include_greedy, "temperature": args.temperature,
             "top_p": args.top_p, "top_k": args.top_k, "max_new_tokens": max_new, "seed": args.seed,
             "mock": bool(args.mock)}
     if P.meta.exists():
-        old = json.loads(P.meta.read_text(encoding="utf-8"))
-        keys = ("policy_adapter", "prompts_sha256", "k", "include_greedy", "temperature", "top_p", "top_k",
-                "max_new_tokens", "seed")
-        diff = {k: (old.get(k), meta[k]) for k in keys if old.get(k) != meta[k]}
+        diff = generation_meta_diff(json.loads(P.meta.read_text(encoding="utf-8")), meta)
         if diff and not args.restart:
             raise SystemExit(f"{P.cands} đã có ứng viên với cấu hình khác {diff}. Thêm --restart để sinh lại từ đầu.")
     if args.restart:
@@ -122,7 +144,7 @@ def stage_generate(args, P: Paths) -> None:
     done = {r["id"] for r in read_jsonl(P.cands)} if P.cands.exists() else set()
     todo = [r for r in selected if r["id"] not in done]
     print(f"Câu hỏi: {len(rows)} hợp lệ | chọn {len(selected)} | đã xong {len(done)} | còn {len(todo)} | "
-          f"policy = {policy or 'Qwen gốc'}")
+          f"policy = {policy or 'mô hình gốc'} ({args.model_config})")
     print("Theo category:", dict(Counter(r["category"] for r in selected)))
     if not todo:
         return
@@ -143,12 +165,12 @@ def stage_generate(args, P: Paths) -> None:
 
     from gout_llmops.models.registry import build_backend
 
-    model_cfg = load_yaml(MODEL_CONFIG)
+    model_cfg = load_yaml(args.model_config)
     model_cfg["name"] = "dpo_candidate_policy"
     if policy:
         model_cfg["adapter_path"] = policy
     backend = build_backend(model_cfg)
-    tok, model = backend.tokenizer, backend.model
+    tok, model, processor = backend.tokenizer, backend.model, getattr(backend, "processor", None)
     tok.padding_side = "left"
     pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     eos = model.generation_config.eos_token_id
@@ -165,8 +187,8 @@ def stage_generate(args, P: Paths) -> None:
     t0, n_done = time.time(), 0
     for b in range(0, len(todo), args.batch_prompts):
         batch = todo[b: b + args.batch_prompts]
-        texts = [tok.apply_chat_template(prompt_messages(system_prompt, r["turns"], r["answers"], r["contexts"][-1]),
-                                         tokenize=False, add_generation_prompt=True, **chat_kwargs) for r in batch]
+        texts = [render_prompt(prompt_messages(system_prompt, r["turns"], r["answers"], r["contexts"][-1]),
+                               tok, processor, chat_kwargs) for r in batch]
         enc = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False)
         n_in = enc["attention_mask"].sum(dim=1).tolist()
         if max(n_in) > max_input:
@@ -318,7 +340,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="stage", required=True)
     g = sub.add_parser("generate")
-    g.add_argument("--policy-adapter", default="none", help="thư mục adapter SFT, hoặc none = Qwen gốc")
+    g.add_argument("--policy-adapter", default="none", help="thư mục adapter SFT, hoặc none = mô hình gốc")
+    g.add_argument("--model-config", default=DEFAULT_MODEL_CONFIG,
+                   help="mô hình sinh ứng viên (configs/models/*.yaml); khác Qwen3-8B thì ghi vào thư mục con riêng")
     g.add_argument("--prompts", default="artifacts/sft_v2/reviewed.jsonl")
     g.add_argument("--k", type=int, default=4, help="số ứng viên mỗi câu (đề cương: 3–5)")
     g.add_argument("--max-prompts", type=int, default=300)
@@ -333,11 +357,13 @@ def main() -> None:
     g.add_argument("--restart", action="store_true", help="xóa ứng viên cũ và sinh lại")
     g.add_argument("--mock", action="store_true")
     s = sub.add_parser("score")
+    s.add_argument("--model-config", default=DEFAULT_MODEL_CONFIG, help="cùng giá trị đã dùng ở generate")
     s.add_argument("--judge-model", default="gpt-4.1-mini")
     s.add_argument("--reward-config", default="configs/evaluation/heuristic_reward_v2.yaml")
     s.add_argument("--workers", type=int, default=4)
     s.add_argument("--mock", action="store_true")
     m = sub.add_parser("mine")
+    m.add_argument("--model-config", default=DEFAULT_MODEL_CONFIG, help="cùng giá trị đã dùng ở generate")
     m.add_argument("--min-chosen-reward", type=float, default=DEFAULT_RULE["min_chosen_reward"])
     m.add_argument("--min-margin", type=float, default=DEFAULT_RULE["min_margin"])
     m.add_argument("--max-chosen-risk", type=int, default=DEFAULT_RULE["max_chosen_risk"])
@@ -347,9 +373,14 @@ def main() -> None:
     m.add_argument("--mock", action="store_true")
     t = sub.add_parser("train")
     t.add_argument("--config", default="configs/training/dpo_v1.yaml")
-    t.add_argument("--policy-adapter", default=None, help="ghi đè policy_adapter trong config (none = Qwen gốc)")
+    t.add_argument("--policy-adapter", default=None, help="ghi đè policy_adapter trong config (none = mô hình gốc)")
     t.add_argument("--smoke-test", action="store_true", help="2 bước, không lưu adapter")
     t.add_argument("--allow-policy-mismatch", action="store_true")
+    t.add_argument("--resume", action="store_true",
+                   help="train tiếp từ checkpoint mới nhất trong output_dir (dữ liệu và config phải giống lần trước)")
+    t.add_argument("--checkpoint-mirror", default=None,
+                   help="thư mục bền cùng tên với output_dir (vd. trên Drive): nhận checkpoint mỗi lần lưu; "
+                        "output_dir chưa có checkpoint thì lấy từ đây")
     args = ap.parse_args()
 
     if args.stage == "train":
@@ -357,9 +388,10 @@ def main() -> None:
         cfg = load_yaml(args.config)
         train_dpo(cfg, smoke_test=args.smoke_test,
                   policy_adapter="from_config" if args.policy_adapter is None else args.policy_adapter,
-                  allow_policy_mismatch=args.allow_policy_mismatch)
+                  allow_policy_mismatch=args.allow_policy_mismatch,
+                  resume=args.resume, mirror_dir=args.checkpoint_mirror)
         return
-    P = Paths(args.mock)
+    P = Paths(args.mock, args.model_config)
     P.work.mkdir(parents=True, exist_ok=True)
     {"generate": stage_generate, "score": stage_score, "mine": stage_mine}[args.stage](args, P)
 
